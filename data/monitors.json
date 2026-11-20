@@ -1,0 +1,54 @@
+[
+  {
+    "id": "dom_1795190571543_32p0",
+    "domain": "github.com",
+    "label": "GitHub Outbound",
+    "intervalMinutes": 15,
+    "channel": "slack",
+    "webhookUrl": "",
+    "status": "optimal",
+    "lastCheckedAt": "2026-11-20T17:26:41.892Z",
+    "lastResponseTimeMs": 2112,
+    "dmarcPolicy": "quarantine",
+    "spfLookupCount": 8,
+    "blacklistedOn": [],
+    "issues": [],
+    "createdAt": "2026-11-20T16:02:51.543Z"
+  },
+  {
+    "id": "dom_stripe",
+    "domain": "stripe.com",
+    "label": "Stripe Corporate Outbound",
+    "intervalMinutes": 15,
+    "channel": "slack",
+    "webhookUrl": "",
+    "status": "optimal",
+    "lastCheckedAt": "2026-11-20T17:26:42.352Z",
+    "lastResponseTimeMs": 457,
+    "dmarcPolicy": "reject",
+    "spfLookupCount": 3,
+    "blacklistedOn": [],
+    "issues": [],
+    "createdAt": "2026-11-10T16:02:02.823Z"
+  },
+  {
+    "id": "dom_blacklisted_demo",
+    "domain": "demo-flagged-sender.com",
+    "label": "Secondary Cold SDR Domain",
+    "intervalMinutes": 15,
+    "channel": "discord",
+    "webhookUrl": "",
+    "status": "critical",
+    "lastCheckedAt": "2026-11-20T17:26:43.471Z",
+    "lastResponseTimeMs": 1116,
+    "dmarcPolicy": "missing",
+    "spfLookupCount": 0,
+    "blacklistedOn": [],
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-flagged-sender.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "createdAt": "2026-11-19T16:02:02.823Z"
+  }
+]

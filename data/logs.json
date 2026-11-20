@@ -1,0 +1,313 @@
+[
+  {
+    "id": "log_1795195603471_1j0x",
+    "domain": "demo-flagged-sender.com",
+    "checkedAt": "2026-11-20T17:26:43.471Z",
+    "status": "critical",
+    "responseTimeMs": 1116,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-flagged-sender.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "discord"
+  },
+  {
+    "id": "log_1795195602352_ot60",
+    "domain": "stripe.com",
+    "checkedAt": "2026-11-20T17:26:42.352Z",
+    "status": "optimal",
+    "responseTimeMs": 457,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "reject",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795195601892_roao",
+    "domain": "github.com",
+    "checkedAt": "2026-11-20T17:26:41.892Z",
+    "status": "optimal",
+    "responseTimeMs": 2112,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "quarantine",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795193499099_kryx",
+    "domain": "demo-flagged-sender.com",
+    "checkedAt": "2026-11-20T16:51:39.100Z",
+    "status": "critical",
+    "responseTimeMs": 964,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-flagged-sender.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "discord"
+  },
+  {
+    "id": "log_1795193498132_fho2",
+    "domain": "stripe.com",
+    "checkedAt": "2026-11-20T16:51:38.132Z",
+    "status": "optimal",
+    "responseTimeMs": 734,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "reject",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795193497393_fkgm",
+    "domain": "github.com",
+    "checkedAt": "2026-11-20T16:51:37.393Z",
+    "status": "optimal",
+    "responseTimeMs": 692,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "quarantine",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795192141996_odh1",
+    "domain": "demo-flagged-sender.com",
+    "checkedAt": "2026-11-20T16:29:01.996Z",
+    "status": "critical",
+    "responseTimeMs": 851,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-flagged-sender.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "discord"
+  },
+  {
+    "id": "log_1795192141141_qygn",
+    "domain": "demo-unaligned-outbound.com",
+    "checkedAt": "2026-11-20T16:29:01.141Z",
+    "status": "critical",
+    "responseTimeMs": 1808,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-unaligned-outbound.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795192139330_6okr",
+    "domain": "stripe.com",
+    "checkedAt": "2026-11-20T16:28:59.330Z",
+    "status": "optimal",
+    "responseTimeMs": 1540,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "reject",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795192137788_uvh4",
+    "domain": "github.com",
+    "checkedAt": "2026-11-20T16:28:57.788Z",
+    "status": "optimal",
+    "responseTimeMs": 1799,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "quarantine",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795191474570_kkg2",
+    "domain": "demo-flagged-sender.com",
+    "checkedAt": "2026-11-20T16:17:54.570Z",
+    "status": "critical",
+    "responseTimeMs": 1255,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-flagged-sender.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "discord"
+  },
+  {
+    "id": "log_1795191473312_hdlw",
+    "domain": "demo-unaligned-outbound.com",
+    "checkedAt": "2026-11-20T16:17:53.312Z",
+    "status": "critical",
+    "responseTimeMs": 2620,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-unaligned-outbound.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795191470688_eqj8",
+    "domain": "stripe.com",
+    "checkedAt": "2026-11-20T16:17:50.689Z",
+    "status": "optimal",
+    "responseTimeMs": 1124,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "reject",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795191469562_owwt",
+    "domain": "github.com",
+    "checkedAt": "2026-11-20T16:17:49.562Z",
+    "status": "optimal",
+    "responseTimeMs": 4516,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "quarantine",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795190823302_qo70",
+    "domain": "demo-flagged-sender.com",
+    "checkedAt": "2026-11-20T16:07:03.302Z",
+    "status": "critical",
+    "responseTimeMs": 2660,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-flagged-sender.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "discord"
+  },
+  {
+    "id": "log_1795190820640_2kgh",
+    "domain": "demo-unaligned-outbound.com",
+    "checkedAt": "2026-11-20T16:07:00.640Z",
+    "status": "critical",
+    "responseTimeMs": 2863,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "No MX records detected. Domain cannot receive bounce reports or incoming replies.",
+      "Missing SPF record. Outbound mail fails sender authorization.",
+      "Missing DMARC record (_dmarc.demo-unaligned-outbound.com). Violates 2024-2026 bulk sender compliance."
+    ],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795190817772_6fpd",
+    "domain": "stripe.com",
+    "checkedAt": "2026-11-20T16:06:57.772Z",
+    "status": "optimal",
+    "responseTimeMs": 1840,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "reject",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795190815929_jvxb",
+    "domain": "github.com",
+    "checkedAt": "2026-11-20T16:06:55.929Z",
+    "status": "optimal",
+    "responseTimeMs": 1886,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "quarantine",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795190594294_2guc",
+    "domain": "github.com",
+    "checkedAt": "2026-11-20T16:03:14.294Z",
+    "status": "optimal",
+    "responseTimeMs": 1390,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "quarantine",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1795190574147_zsel",
+    "domain": "github.com",
+    "checkedAt": "2026-11-20T16:02:54.147Z",
+    "status": "optimal",
+    "responseTimeMs": 2603,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "quarantine",
+    "issues": [],
+    "alertDispatched": false,
+    "channel": "slack"
+  },
+  {
+    "id": "log_1",
+    "domain": "demo-flagged-sender.com",
+    "checkedAt": "2026-11-20T16:01:02.823Z",
+    "status": "critical",
+    "responseTimeMs": 420,
+    "blacklistedCount": 2,
+    "dmarcPolicy": "missing",
+    "issues": [
+      "Actively listed on Spamhaus ZEN",
+      "SPF PermError: 12 lookups exceeds RFC limit of 10"
+    ],
+    "alertDispatched": true,
+    "channel": "discord"
+  },
+  {
+    "id": "log_2",
+    "domain": "stripe.com",
+    "checkedAt": "2026-11-20T15:59:02.823Z",
+    "status": "optimal",
+    "responseTimeMs": 480,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "reject",
+    "issues": [],
+    "alertDispatched": false
+  },
+  {
+    "id": "log_3",
+    "domain": "demo-unaligned-outbound.com",
+    "checkedAt": "2026-11-20T15:54:02.823Z",
+    "status": "at_risk",
+    "responseTimeMs": 510,
+    "blacklistedCount": 0,
+    "dmarcPolicy": "none",
+    "issues": [
+      "DMARC policy set to p=none"
+    ],
+    "alertDispatched": false
+  }
+]

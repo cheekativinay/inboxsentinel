@@ -1,0 +1,213 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+/* =========================================================================
+   LIGHT THEME: Anthropic / Stripe Press / Aesop Archetype
+   Warm Alabaster Canvas (#FAF9F5), Deep Graphite Ink (#141413),
+   Hairline Borders (#E8E6DC), Zero Cold Tech Glare.
+   ========================================================================= */
+:root {
+  --bg-base: #faf9f5;
+  --bg-surface: #ffffff;
+  --bg-elevated: #f4f3ed;
+  --bg-hover: #ebe9e0;
+  --border-subtle: #e8e6dc;
+  --border-prominent: #d4d1c4;
+  --border-focus: #78716c;
+  --text-primary: #141413;
+  --text-secondary: #57534e;
+  --text-muted: #78716c;
+  --text-dim: #a8a29e;
+  --accent-emerald: #059669;
+  --accent-amber: #d97706;
+  --accent-rose: #e11d48;
+  --badge-emerald-bg: #ecfdf5;
+  --badge-emerald-border: #a7f3d0;
+  --badge-emerald-text: #065f46;
+  --badge-amber-bg: #fffbeb;
+  --badge-amber-border: #fde68a;
+  --badge-amber-text: #92400e;
+  --badge-rose-bg: #fff1f2;
+  --badge-rose-border: #fecdd3;
+  --badge-rose-text: #9f1239;
+  --btn-primary-bg: #141413;
+  --btn-primary-text: #ffffff;
+  --btn-primary-hover: #262624;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --code-bg: #f4f3ed;
+  --code-text: #141413;
+}
+
+/* =========================================================================
+   DARK THEME: Resend / Raycast / Linear Archetype
+   Warm Obsidian Canvas (#0C0C0B), Crisp Off-White Ink (#F5F3EF),
+   Stepped Surface (#141412), Precision Hairline Rules (#242320).
+   ========================================================================= */
+.dark {
+  --bg-base: #0c0c0b;
+  --bg-surface: #141412;
+  --bg-elevated: #1b1b18;
+  --bg-hover: #22211e;
+  --border-subtle: #242320;
+  --border-prominent: #33322d;
+  --border-focus: #525049;
+  --text-primary: #f5f3ef;
+  --text-secondary: #a39e93;
+  --text-muted: #706b62;
+  --text-dim: #4d4942;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --badge-emerald-bg: rgba(6, 78, 59, 0.3);
+  --badge-emerald-border: rgba(16, 185, 129, 0.4);
+  --badge-emerald-text: #6ee7b7;
+  --badge-amber-bg: rgba(120, 53, 15, 0.3);
+  --badge-amber-border: rgba(245, 158, 11, 0.4);
+  --badge-amber-text: #fcd34d;
+  --badge-rose-bg: rgba(136, 19, 55, 0.3);
+  --badge-rose-border: rgba(244, 63, 94, 0.4);
+  --badge-rose-text: #fda4af;
+  --btn-primary-bg: #f5f3ef;
+  --btn-primary-text: #0c0c0b;
+  --btn-primary-hover: #ffffff;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --code-bg: #0c0c0b;
+  --code-text: #f5f3ef;
+}
+
+/* Auto-system fallback when neither .light nor .dark class is explicitly bound */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg-base: #0c0c0b;
+    --bg-surface: #141412;
+    --bg-elevated: #1b1b18;
+    --bg-hover: #22211e;
+    --border-subtle: #242320;
+    --border-prominent: #33322d;
+    --border-focus: #525049;
+    --text-primary: #f5f3ef;
+    --text-secondary: #a39e93;
+    --text-muted: #706b62;
+    --text-dim: #4d4942;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --badge-emerald-bg: rgba(6, 78, 59, 0.3);
+    --badge-emerald-border: rgba(16, 185, 129, 0.4);
+    --badge-emerald-text: #6ee7b7;
+    --badge-amber-bg: rgba(120, 53, 15, 0.3);
+    --badge-amber-border: rgba(245, 158, 11, 0.4);
+    --badge-amber-text: #fcd34d;
+    --badge-rose-bg: rgba(136, 19, 55, 0.3);
+    --badge-rose-border: rgba(244, 63, 94, 0.4);
+    --badge-rose-text: #fda4af;
+    --btn-primary-bg: #f5f3ef;
+    --btn-primary-text: #0c0c0b;
+    --btn-primary-hover: #ffffff;
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --code-bg: #0c0c0b;
+    --code-text: #f5f3ef;
+  }
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* Enforce pointer cursor on all clickables without exception */
+button,
+[role="button"],
+a,
+select,
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="submit"],
+summary,
+.cursor-pointer,
+[data-clickable="true"] {
+  cursor: pointer !important;
+}
+
+/* Tactile press states & smooth micro-transitions (Emil Kowalski Physics) */
+button,
+a,
+[role="button"] {
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 150ms ease,
+              border-color 150ms ease,
+              color 150ms ease,
+              box-shadow 150ms ease;
+}
+
+button:active:not(:disabled),
+a:active:not(:disabled),
+[role="button"]:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Tabular numerals for timestamps, DNS records, and data tables */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Precision typography classes */
+.font-editorial {
+  font-family: var(--font-serif), Georgia, serif;
+}
+
+.font-telemetry {
+  font-family: var(--font-mono), monospace;
+}
+
+/* Architectural hairline grid lines & accents */
+.hairline-b {
+  border-bottom: 1px solid var(--border-subtle);
+}
+.hairline-t {
+  border-top: 1px solid var(--border-subtle);
+}
+.hairline-r {
+  border-right: 1px solid var(--border-subtle);
+}
+.hairline-l {
+  border-left: 1px solid var(--border-subtle);
+}
+
+/* Subtle refined scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-prominent);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
+
+/* Pulse animation for real-time live monitoring indicators */
+@keyframes sentinel-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
+.animate-sentinel-pulse {
+  animation: sentinel-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
