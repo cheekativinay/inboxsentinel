@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { validateWebhookUrl, validateAndSanitizeDomain } from '@/lib/dns-engine';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { webhookUrl, channel = 'slack', domain = 'outbound-sdr.com' } = body;
 
-    if (!webhookUrl || typeof webhookUrl !== 'string') {
-      return NextResponse.json({ error: 'Webhook URL is required' }, { status: 400 });
+    // SSRF & Protocol Safety Guard
+    const webhookValidation = validateWebhookUrl(webhookUrl);
+    if (!webhookValidation.valid) {
+      return NextResponse.json({ error: webhookValidation.error || 'Invalid webhook URL' }, { status: 400 });
     }
+
+    const domainValidation = validateAndSanitizeDomain(domain);
+    const targetDomain = domainValidation.valid ? domainValidation.domain : 'outbound-domain.com';
 
     const timestamp = new Date().toLocaleTimeString();
 

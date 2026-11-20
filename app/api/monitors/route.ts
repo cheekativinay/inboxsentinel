@@ -6,6 +6,7 @@ import {
   MonitoredDomain,
 } from '@/lib/store';
 import { executeDomainCheck } from '@/lib/watchdog';
+import { validateAndSanitizeDomain, validateWebhookUrl } from '@/lib/dns-engine';
 
 export async function GET() {
   try {
@@ -23,16 +24,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { domain, label, intervalMinutes = 15, channel = 'slack', webhookUrl = '' } = body;
 
-    if (!domain || typeof domain !== 'string' || !domain.trim().includes('.')) {
-      return NextResponse.json({ error: 'Valid domain name is required' }, { status: 400 });
+    const domainValidation = validateAndSanitizeDomain(domain);
+    if (!domainValidation.valid) {
+      return NextResponse.json({ error: domainValidation.error || 'Invalid domain' }, { status: 400 });
     }
+    const cleanDomain = domainValidation.domain;
 
-    const cleanDomain = domain
-      .trim()
-      .toLowerCase()
-      .replace(/^https?:\/\//i, '')
-      .replace(/^www\./i, '')
-      .split('/')[0];
+    if (webhookUrl && webhookUrl.trim()) {
+      const webhookValidation = validateWebhookUrl(webhookUrl);
+      if (!webhookValidation.valid) {
+        return NextResponse.json({ error: webhookValidation.error || 'Invalid webhook URL' }, { status: 400 });
+      }
+    }
 
     const domains = getMonitoredDomains();
 

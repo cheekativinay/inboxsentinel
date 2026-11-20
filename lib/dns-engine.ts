@@ -70,15 +70,96 @@ function withTimeout<T>(promise: Promise<T>, ms = 3000): Promise<T> {
   ]);
 }
 
-export async function auditDomainDeliverability(rawInput: string): Promise<DomainAuditResult> {
-  const startTime = Date.now();
-  let domain = rawInput
+// Security: Validates domain to prevent SSRF and internal network probing
+export function validateAndSanitizeDomain(rawInput: string): { valid: boolean; domain: string; error?: string } {
+  if (!rawInput || typeof rawInput !== 'string') {
+    return { valid: false, domain: '', error: 'Domain name is required.' };
+  }
+
+  const cleaned = rawInput
     .trim()
     .toLowerCase()
     .replace(/^https?:\/\//i, '')
     .replace(/^www\./i, '')
     .split('/')[0]
-    .split('?')[0];
+    .split('?')[0]
+    .split(':')[0]; // Remove port if present
+
+  if (!cleaned || cleaned.length > 253) {
+    return { valid: false, domain: '', error: 'Domain name must be between 1 and 253 characters.' };
+  }
+
+  // Reject IP addresses (IPv4 & IPv6)
+  const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(cleaned);
+  const isIpv6 = /^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$/.test(cleaned);
+  if (isIpv4 || isIpv6) {
+    return { valid: false, domain: '', error: 'Direct IP addresses are not permitted. Please provide an outbound domain name (e.g., yourcompany.com).' };
+  }
+
+  // Reject private / non-routable hostnames
+  const forbiddenNames = ['localhost', 'broadcasthost'];
+  const forbiddenSuffixes = ['.local', '.internal', '.lan', '.test', '.example', '.invalid', '.home', '.corp'];
+  if (forbiddenNames.includes(cleaned) || forbiddenSuffixes.some((suffix) => cleaned.endsWith(suffix))) {
+    return { valid: false, domain: '', error: 'Internal, local, and test domains cannot be monitored.' };
+  }
+
+  // Strict FQDN regex
+  const fqdnRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+  if (!fqdnRegex.test(cleaned)) {
+    return { valid: false, domain: '', error: 'Invalid domain syntax. Please provide a standard domain name (e.g., acme-mail.com).' };
+  }
+
+  // Ensure TLD is at least 2 characters
+  const parts = cleaned.split('.');
+  if (parts[parts.length - 1].length < 2) {
+    return { valid: false, domain: '', error: 'Invalid top-level domain (TLD).' };
+  }
+
+  return { valid: true, domain: cleaned };
+}
+
+// Security: Validates outbound webhooks to prevent SSRF
+export function validateWebhookUrl(rawUrl: string): { valid: boolean; error?: string } {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return { valid: false, error: 'Webhook URL is required.' };
+  }
+
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (parsed.protocol !== 'https:') {
+      return { valid: false, error: 'Webhooks must use secure HTTPS protocol.' };
+    }
+
+    const host = parsed.hostname.toLowerCase();
+
+    // Disallow localhost and private IP ranges
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host === '169.254.169.254' ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      host.startsWith('172.16.') ||
+      host.endsWith('.local') ||
+      host.endsWith('.internal')
+    ) {
+      return { valid: false, error: 'Private, internal, or loopback webhook destinations are rejected.' };
+    }
+
+    return { valid: true };
+  } catch {
+    return { valid: false, error: 'Malformed webhook URL syntax.' };
+  }
+}
+
+export async function auditDomainDeliverability(rawInput: string): Promise<DomainAuditResult> {
+  const startTime = Date.now();
+  const validation = validateAndSanitizeDomain(rawInput);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Invalid domain');
+  }
+  const domain = validation.domain;
 
   const resolver = new dns.promises.Resolver();
 
@@ -235,14 +316,23 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
     try {
       const res = await withTimeout(resolver.resolve4(queryHost), 2000);
       if (res && res.length > 0) {
-        listedCount++;
-        return {
-          host: server.host,
-          name: server.name,
-          listed: true,
-          returnCode: res[0],
-          description: server.desc,
-        };
+        const returnCode = res[0];
+        // Protection: Spamhaus returns 127.255.255.254 or .255 when queried via an open resolver.
+        // This is a query refusal notice, NOT a blacklist entry.
+        const isSpamhausRefusal =
+          server.host.includes('spamhaus') &&
+          (returnCode === '127.255.255.254' || returnCode === '127.255.255.255');
+
+        if (!isSpamhausRefusal) {
+          listedCount++;
+          return {
+            host: server.host,
+            name: server.name,
+            listed: true,
+            returnCode,
+            description: server.desc,
+          };
+        }
       }
     } catch {
       // ENOTFOUND means NOT listed (Clean!)

@@ -64,6 +64,9 @@ export default function HomePage() {
   // Pricing state
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
+  // Legal & Trust Modal state
+  const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms' | 'security' | null>(null);
+
   // ROI Calculator state
   const [monthlyOutboundBudget, setMonthlyOutboundBudget] = useState<number>(20000);
 
@@ -1477,16 +1480,39 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] py-8 text-xs text-[var(--text-muted)] transition-colors duration-200">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-[var(--text-primary)]">InboxSentinel</span>
             <span>—</span>
             <span>Passive domain observability for B2B outbound teams.</span>
           </div>
-          <div className="flex items-center gap-4 font-telemetry text-[11px]">
-            <span>Google Workspace & M365 Compatible</span>
+          <div className="flex flex-wrap items-center gap-4 font-telemetry text-[11px]">
+            <button
+              type="button"
+              data-clickable="true"
+              onClick={() => setLegalModalTab('privacy')}
+              className="hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
+            >
+              Privacy Policy
+            </button>
             <span>•</span>
-            <span>Zero-Access Architecture</span>
+            <button
+              type="button"
+              data-clickable="true"
+              onClick={() => setLegalModalTab('terms')}
+              className="hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
+            >
+              Terms of Service
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              data-clickable="true"
+              onClick={() => setLegalModalTab('security')}
+              className="hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
+            >
+              Security & Zero-Access
+            </button>
             <span>•</span>
             <span>RFC 7208 & 7489 Aligned</span>
           </div>
@@ -1639,6 +1665,176 @@ export default function HomePage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TRUST, LEGAL & SECURITY CENTER */}
+      {legalModalTab && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="max-w-2xl w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 shadow-2xl space-y-6 transform animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--border-subtle)] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <Shield className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Trust, Legal & Architecture Center</h3>
+                  <p className="text-[11px] text-[var(--text-muted)] font-telemetry">Enterprise-grade observability, zero-liability compliance, and consumer protection.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-clickable="true"
+                onClick={() => setLegalModalTab(null)}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Segmented Tab Switcher */}
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)] shrink-0">
+              <button
+                type="button"
+                data-clickable="true"
+                onClick={() => setLegalModalTab('privacy')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  legalModalTab === 'privacy'
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs font-semibold'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Privacy Policy (Zero-Data)
+              </button>
+              <button
+                type="button"
+                data-clickable="true"
+                onClick={() => setLegalModalTab('terms')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  legalModalTab === 'terms'
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs font-semibold'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Terms & Disclaimers
+              </button>
+              <button
+                type="button"
+                data-clickable="true"
+                onClick={() => setLegalModalTab('security')}
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  legalModalTab === 'security'
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs font-semibold'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Security & RFC Specs
+              </button>
+            </div>
+
+            {/* Tab Body */}
+            <div className="overflow-y-auto space-y-4 pr-1 text-xs text-[var(--text-secondary)] leading-relaxed flex-1">
+              {legalModalTab === 'privacy' && (
+                <div className="space-y-4">
+                  <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                    <strong className="block text-xs font-semibold mb-0.5">Zero Personally Identifiable Information (PII) Guarantee</strong>
+                    InboxSentinel is an infrastructure observability service. We never collect, inspect, process, or store email messages, prospect databases, or mailbox passwords.
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">1. What We Collect</h4>
+                    <p>We store only customer-provided domain names, optional label names, alert dispatch webhook endpoints, and public DNS telemetry logs resulting from diagnostic probes.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">2. How Data is Gathered</h4>
+                    <p>All domain diagnostic scans execute read-only queries against global public internet root servers (DNS RFC 1035, SPF RFC 7208, DMARC RFC 7489). These records are public internet data and not subject to private data ownership laws.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">3. GDPR, CCPA & CAN-SPAM Status</h4>
+                    <p>Because InboxSentinel operates strictly with non-personal public technical infrastructure records, customer use is fully GDPR and CCPA compliant by design. We do not transmit commercial electronic marketing messages on behalf of any user.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">4. Zero Data Monetization</h4>
+                    <p>We never sell, lease, rent, or trade customer domain lists, telemetry logs, or webhook endpoints to third parties or advertising networks.</p>
+                  </div>
+                </div>
+              )}
+
+              {legalModalTab === 'terms' && (
+                <div className="space-y-4">
+                  <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+                    <strong className="block text-xs font-semibold mb-0.5">ISP Delivery & Inbox Placement Disclaimer</strong>
+                    InboxSentinel is a technical monitoring and alerting tool. We do not and cannot guarantee 100% email delivery or inbox placement to third-party mailbox providers.
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">1. Nature of the Service</h4>
+                    <p>InboxSentinel provides automated diagnostics of public DNSBL spam blacklists, SPF lookup ceilings, and DMARC enforcement policies. Alert sirens are dispatched on best-effort passive socket triggers.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">2. Third-Party Mailbox Algorithms</h4>
+                    <p>Recipient email providers (including Google Workspace, Microsoft 365, and Yahoo Mail) employ autonomous heuristic spam filters influenced by factors outside InboxSentinel&apos;s control, including sender copy, sending volume, prospect engagement, and IP reputation.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">3. Fair Use & Prohibited Conduct</h4>
+                    <p>Users agree not to use InboxSentinel to target, probe, or scan unauthorized networks, private subnets, localhost endpoints, or engage in denial-of-service attempts. Violations result in immediate domain termination.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">4. Cancellation & Refund Policy</h4>
+                    <p>Subscriptions may be canceled at any time with zero cancellation penalties. Customers requesting a refund within 14 days of billing will receive a prompt, 100% money-back refund.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">5. Limitation of Liability</h4>
+                    <p>To the maximum extent permitted by applicable law, InboxSentinel&apos;s total aggregate liability for any claims arising from the use of the platform shall not exceed the total fees paid by the customer in the preceding 3 months.</p>
+                  </div>
+                </div>
+              )}
+
+              {legalModalTab === 'security' && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">1. Zero Write Access to Domain DNS</h4>
+                    <p>InboxSentinel operates purely with non-privileged read-only DNS queries. Our platform has no technical capability to alter, modify, hijack, or delete your DNS records or nameserver delegations.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">2. Server-Side Request Forgery (SSRF) Guard</h4>
+                    <p>All webhook endpoints and domain inputs undergo strict server-side validation against private subnets (RFC 1918), loopback interfaces (127.0.0.1), and link-local cloud metadata endpoints (169.254.169.254). Malformed and unsafe destinations are rejected at the edge.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">3. Spamhaus Open Resolver Refusal Guard</h4>
+                    <p>Our query pipeline filters Spamhaus open resolver refusal codes (127.255.255.254/255) to prevent false positives and verify authentic blacklist listings only.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] font-telemetry">4. Encryption in Transit</h4>
+                    <p>All web interface traffic, API communications, and outgoing alert siren payloads require modern TLS 1.3 encryption over HTTPS.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                data-clickable="true"
+                onClick={() => setLegalModalTab(null)}
+                className="px-5 py-2.5 rounded-lg bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 text-xs font-semibold transition-all cursor-pointer"
+              >
+                Close Center
+              </button>
+            </div>
           </div>
         </div>
       )}
