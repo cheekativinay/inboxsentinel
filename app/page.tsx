@@ -64,6 +64,7 @@ export default function HomePage() {
   // Webhook Test Alert state
   const [isTestingWebhook, setIsTestingWebhook] = useState(false);
   const [testAlertMessage, setTestAlertMessage] = useState<string | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   // Pricing state
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -280,6 +281,26 @@ export default function HomePage() {
     navigator.clipboard.writeText(val);
     setCopiedSnippet(true);
     setTimeout(() => setCopiedSnippet(false), 2000);
+  };
+
+  const handleCopyDiagnosticSummary = () => {
+    if (!auditResult) return;
+    const cleanCount = auditResult.blacklists.cleanCount;
+    const totalCount = auditResult.blacklists.totalChecked;
+    const scoreVal = auditResult.healthScore;
+    const mxCount = auditResult.mx.records.length;
+    const summary = `🛡️ InboxSentinel Diagnostic Report: ${auditResult.domain}
+• Deliverability Index: ${scoreVal}/100 (${auditResult.healthStatus})
+• Mail Provider: ${auditResult.emailProvider} (${mxCount} MX hosts)
+• SPF Protocol: ${auditResult.spf.lookupCount}/10 DNS lookups (${auditResult.spf.status})
+• DMARC Policy: p=${auditResult.dmarc.policy || 'missing'} (Compliant: ${auditResult.dmarc.isCompliantGoogleYahoo2024 ? 'Yes' : 'No'})
+• Blacklist Socket Status: ${cleanCount}/${totalCount} Clean (Spamhaus, Barracuda, SpamCop)
+• Latency: ${auditResult.responseTimeMs}ms
+Audited via InboxSentinel (Passive Public DNSBL Engine) · https://inboxsentinel.vercel.app`;
+
+    navigator.clipboard.writeText(summary);
+    setCopiedSummary(true);
+    setTimeout(() => setCopiedSummary(false), 2000);
   };
 
   // Interactive Outbound Risk Model Math
@@ -614,6 +635,26 @@ export default function HomePage() {
                             : 'Blacklisted on Spam Authorities'}
                         </span>
                       </span>
+
+                      <button
+                        type="button"
+                        data-clickable="true"
+                        onClick={handleCopyDiagnosticSummary}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-[var(--border-prominent)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] transition-all cursor-pointer active:scale-[0.98]"
+                        title="Copy formatted diagnostic report to clipboard"
+                      >
+                        {copiedSummary ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            <span className="font-telemetry text-[11px] text-emerald-600 dark:text-emerald-400">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+                            <span className="font-telemetry text-[11px]">Copy Diagnostic</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 

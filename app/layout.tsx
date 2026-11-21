@@ -23,9 +23,39 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://inboxsentinel.vercel.app'),
   title: 'InboxSentinel | B2B Outbound Deliverability Watchdog',
   description:
     'Continuous diagnostic monitoring for B2B cold outbound domains. Real-time Spamhaus blacklists, DMARC alignment, and SPF 10-lookup PermError detection.',
+  keywords: [
+    'email deliverability',
+    'domain watchdog',
+    'Spamhaus blacklist check',
+    'cold email deliverability',
+    'DMARC compliance 2026',
+    'SPF lookup permError',
+    'SDR outbound monitoring',
+  ],
+  authors: [{ name: 'InboxSentinel' }],
+  openGraph: {
+    title: 'InboxSentinel | B2B Outbound Deliverability Watchdog',
+    description:
+      'Zero-access passive public DNS tripwires and blacklist alarms for B2B cold outbound domains. Instant sirens to Slack and Discord.',
+    url: 'https://inboxsentinel.vercel.app',
+    siteName: 'InboxSentinel',
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'InboxSentinel | B2B Outbound Deliverability Watchdog',
+    description:
+      'Zero-access passive public DNS tripwires and blacklist alarms for B2B cold outbound domains.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
