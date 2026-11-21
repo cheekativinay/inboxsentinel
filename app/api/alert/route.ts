@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateWebhookUrl, validateAndSanitizeDomain } from '@/lib/dns-engine';
+import { validateAndSanitizeDomain } from '@/lib/dns-engine';
+import { checkRateLimit, getClientIp, dispatchSecureWebhook, validateSafeWebhookUrl } from '@/lib/security';
 
 export async function POST(req: NextRequest) {
   try {
+    // 1. Rate Limiting (10 test siren dispatches / minute per IP)
+    const clientIp = getClientIp(req.headers);
+    const rateCheck = checkRateLimit(`alert_${clientIp}`, 10, 60000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Too many siren tests. Please wait a minute before sending another test alarm.' },
+        { status: 429, headers: { 'Retry-After': '60' } }
+      );
+    }
+
     const body = await req.json();
     const { webhookUrl, channel = 'slack', domain = 'outbound-sdr.com' } = body;
 
-    // SSRF & Protocol Safety Guard
-    const webhookValidation = validateWebhookUrl(webhookUrl);
+    // 2. Strict Pre-flight SSRF Validation (Blocks localhost, private CIDRs & cloud metadata)
+    const webhookValidation = await validateSafeWebhookUrl(webhookUrl);
     if (!webhookValidation.valid) {
-      return NextResponse.json({ error: webhookValidation.error || 'Invalid webhook URL' }, { status: 400 });
+      return NextResponse.json({ error: webhookValidation.error || 'Invalid or unsafe webhook URL' }, { status: 400 });
     }
 
     const domainValidation = validateAndSanitizeDomain(domain);
@@ -21,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     if (channel === 'slack') {
       payload = {
-        text: `[InboxSentinel ALARM] Outbound deliverability dropped on ${domain}`,
+        text: `[InboxSentinel ALARM] Outbound deliverability dropped on ${targetDomain}`,
         blocks: [
           {
             type: 'header',
@@ -34,7 +45,7 @@ export async function POST(req: NextRequest) {
           {
             type: 'section',
             fields: [
-              { type: 'mrkdwn', text: `*Domain:*\n\`${domain}\`` },
+              { type: 'mrkdwn', text: `*Domain:*\n\`${targetDomain}\`` },
               { type: 'mrkdwn', text: `*Severity:*\n🔥 CRITICAL BLACKLIST` },
               { type: 'mrkdwn', text: `*Flagged Authority:*\nSpamhaus ZEN` },
               { type: 'mrkdwn', text: `*Est. Pipeline Risk:*\n~$3,200 in burned meetings` },
@@ -55,37 +66,23 @@ export async function POST(req: NextRequest) {
       payload = {
         source: 'InboxSentinel',
         alert: 'CRITICAL_BLACKLIST_LISTING',
-        domain,
+        domain: targetDomain,
         status: 'CRITICAL',
         timestamp: new Date().toISOString(),
-        message: `Emergency: ${domain} was flagged on Spamhaus ZEN. Outbound cold campaigns are landing in spam.`,
+        message: `Emergency: ${targetDomain} was flagged on Spamhaus ZEN. Outbound cold campaigns are landing in spam.`,
       };
     }
 
-    try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+    // 3. Dispatch Webhook with Strict Timeout & Size Limits
+    const dispatchResult = await dispatchSecureWebhook(webhookUrl, payload);
 
-      if (!response.ok) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Remote webhook responded with HTTP ${response.status}. Please check webhook permissions.`,
-          },
-          { status: 400 }
-        );
-      }
-    } catch (dispatchErr: unknown) {
-      const msg = dispatchErr instanceof Error ? dispatchErr.message : 'Network error';
+    if (!dispatchResult.success) {
       return NextResponse.json(
         {
           success: false,
-          message: `Delivery failed: ${msg}. If this is a demo, simulation payload structure was validated.`,
+          message: `Delivery failed: ${dispatchResult.error}. If this is a demo, simulation payload structure was validated.`,
         },
-        { status: 502 }
+        { status: dispatchResult.statusCode || 400 }
       );
     }
 

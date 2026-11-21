@@ -30,7 +30,7 @@ export async function POST(
   try {
     const { id } = await context.params;
     const domains = getMonitoredDomains();
-    const index = domains.findIndex((d) => d.id !== id);
+    const index = domains.findIndex((d) => d.id === id);
 
     if (index === -1) {
       return NextResponse.json({ error: 'Domain monitor not found' }, { status: 404 });

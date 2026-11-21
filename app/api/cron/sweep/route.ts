@@ -1,31 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { runAllDomainChecks } from '@/lib/watchdog';
+import { checkRateLimit, getClientIp } from '@/lib/security';
 
 /**
  * 24/7 Background Sweep Endpoint
- * Can be called by:
- * - cron-job.org (Free external scheduled pinger)
- * - GitHub Actions (schedule cron)
- * - Netlify / Vercel scheduled cron jobs
- * - UptimeRobot / BetterStack HTTP monitor
+ * Protected against unauthorized sweeps, timing attacks, and query-string credential leakage.
  */
 async function handleSweep(req: NextRequest) {
   const startTime = Date.now();
-
-  // Security check: If CRON_SECRET is configured, enforce authorization
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const authHeader = req.headers.get('authorization');
-    const secretParam = req.nextUrl.searchParams.get('secret');
+
+  if (cronSecret && cronSecret.length >= 8) {
+    // Constant-time token verification via Authorization header only
+    const authHeader = req.headers.get('authorization') || '';
+    const expected = `Bearer ${cronSecret}`;
+
+    const authBuf = Buffer.from(authHeader);
+    const expectedBuf = Buffer.from(expected);
 
     const isAuthorized =
-      authHeader === `Bearer ${cronSecret}` ||
-      secretParam === cronSecret;
+      authBuf.length === expectedBuf.length &&
+      crypto.timingSafeEqual(authBuf, expectedBuf);
 
     if (!isAuthorized) {
       return NextResponse.json(
-        { error: 'Unauthorized. Invalid or missing CRON_SECRET.' },
+        { error: 'Unauthorized. Bearer token in Authorization header required.' },
         { status: 401 }
+      );
+    }
+  } else {
+    // Fallback defense if CRON_SECRET is not yet set: Limit to 1 sweep per 2 minutes per IP
+    const clientIp = getClientIp(req.headers);
+    const rateCheck = checkRateLimit(`cron_sweep_${clientIp}`, 1, 120000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded for sweep invocations. Set CRON_SECRET for unlimited authorized sweeps.' },
+        { status: 429, headers: { 'Retry-After': '120' } }
       );
     }
   }
@@ -68,10 +79,11 @@ async function handleSweep(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function POST(req: NextRequest) {
   return handleSweep(req);
 }
 
-export async function POST(req: NextRequest) {
+// Allow GET only for standard monitoring pingers (e.g. cron-job.org / GitHub Action HTTP steps)
+export async function GET(req: NextRequest) {
   return handleSweep(req);
 }

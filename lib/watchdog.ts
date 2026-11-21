@@ -1,4 +1,6 @@
+import crypto from 'crypto';
 import { auditDomainDeliverability } from './dns-engine';
+import { dispatchSecureWebhook } from './security';
 import {
   MonitoredDomain,
   CheckLog,
@@ -90,14 +92,11 @@ export async function executeDomainCheck(item: MonitoredDomain): Promise<{
         };
       }
 
-      const res = await fetch(item.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
+      const dispatchRes = await dispatchSecureWebhook(item.webhookUrl, payload);
+      if (dispatchRes.success) {
         alertDispatched = true;
+      } else {
+        console.warn(`Watchdog webhook dispatch failed for ${item.domain}: ${dispatchRes.error}`);
       }
     } catch (err) {
       console.error(`Failed to dispatch alert for ${item.domain}:`, err);
@@ -116,7 +115,7 @@ export async function executeDomainCheck(item: MonitoredDomain): Promise<{
   };
 
   const newLog: CheckLog = {
-    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    id: `log_${crypto.randomUUID()}`,
     domain: item.domain,
     checkedAt: new Date().toISOString(),
     status: newStatus,

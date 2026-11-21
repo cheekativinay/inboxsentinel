@@ -91,10 +91,14 @@ export function getMonitoredDomains(): MonitoredDomain[] {
 }
 
 export function saveMonitoredDomains(domains: MonitoredDomain[]) {
-  inMemoryDomains = [...domains];
+  // Cap to 50 domains max to prevent unbounded memory/disk exhaustion
+  const capped = domains.slice(0, 50);
+  inMemoryDomains = [...capped];
   try {
     ensureDir();
-    fs.writeFileSync(MONITORS_FILE, JSON.stringify(domains, null, 2), 'utf-8');
+    const tmpFile = `${MONITORS_FILE}.tmp.${Date.now()}`;
+    fs.writeFileSync(tmpFile, JSON.stringify(capped, null, 2), 'utf-8');
+    fs.renameSync(tmpFile, MONITORS_FILE);
   } catch (err) {
     console.error('Filesystem write notice (using in-memory cache):', err);
   }
@@ -125,7 +129,9 @@ export function appendCheckLog(log: CheckLog) {
     logs.unshift(log);
     const trimmed = logs.slice(0, 50);
     ensureDir();
-    fs.writeFileSync(LOGS_FILE, JSON.stringify(trimmed, null, 2), 'utf-8');
+    const tmpFile = `${LOGS_FILE}.tmp.${Date.now()}`;
+    fs.writeFileSync(tmpFile, JSON.stringify(trimmed, null, 2), 'utf-8');
+    fs.renameSync(tmpFile, LOGS_FILE);
   } catch (err) {
     console.error('Filesystem log notice (using in-memory cache):', err);
   }

@@ -161,10 +161,11 @@ export function validateAndSanitizeDomain(rawInput: string): { valid: boolean; d
     return { valid: false, domain: '', error: 'Invalid domain syntax. Please provide a standard domain name (e.g., acme-mail.com).' };
   }
 
-  // Ensure TLD is at least 2 characters
+  // Ensure TLD is at least 2 characters and conforms to ICANN/RFC 1123 standards (no purely numeric TLDs)
   const parts = cleaned.split('.');
-  if (parts[parts.length - 1].length < 2) {
-    return { valid: false, domain: '', error: 'Invalid top-level domain (TLD).' };
+  const tld = parts[parts.length - 1];
+  if (tld.length < 2 || !/^[a-z]{2,}$|^xn--[a-z0-9]+$/i.test(tld)) {
+    return { valid: false, domain: '', error: 'Invalid top-level domain (TLD). TLD must be alphabetic or valid punycode.' };
   }
 
   return { valid: true, domain: cleaned };
@@ -271,15 +272,17 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
     const parts = spfRecord.split(/\s+/);
     for (const part of parts) {
       const lower = part.toLowerCase();
+      // Strip leading RFC 7208 qualifier (+, -, ~, ?) before matching mechanism name
+      const mechanism = lower.replace(/^[+\-~?]/, '');
       if (
-        lower.startsWith('include:') ||
-        lower.startsWith('a:') ||
-        lower === 'a' ||
-        lower.startsWith('mx:') ||
-        lower === 'mx' ||
-        lower.startsWith('ptr:') ||
-        lower.startsWith('exists:') ||
-        lower.startsWith('redirect=')
+        mechanism.startsWith('include:') ||
+        mechanism.startsWith('a:') ||
+        mechanism === 'a' ||
+        mechanism.startsWith('mx:') ||
+        mechanism === 'mx' ||
+        mechanism.startsWith('ptr:') ||
+        mechanism.startsWith('exists:') ||
+        mechanism.startsWith('redirect=')
       ) {
         spfLookupCount++;
       }
@@ -325,7 +328,8 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
   const dmarcIssues: string[] = [];
 
   if (dmarcRecord) {
-    const pMatch = dmarcRecord.match(/p=([a-z]+)/i);
+    // Assert start-of-record or semicolon delimiter to prevent 'sp=reject' from matching 'p=reject'
+    const pMatch = dmarcRecord.match(/(?:^|;\s*)p=([a-z]+)/i);
     if (pMatch) {
       const pol = pMatch[1].toLowerCase();
       if (pol === 'reject') dmarcPolicy = 'reject';
@@ -333,7 +337,7 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
       else if (pol === 'none') dmarcPolicy = 'none';
     }
 
-    const ruaMatch = dmarcRecord.match(/rua=([^;]+)/i);
+    const ruaMatch = dmarcRecord.match(/(?:^|;\s*)rua=([^;]+)/i);
     if (ruaMatch) {
       dmarcRua = ruaMatch[1].trim();
     }
@@ -451,8 +455,8 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
       if (res && res.length > 0) {
         const returnCode = res[0];
 
-        // Spamhaus ZEN: 127.255.255.254/255 indicates query refusal via open recursive resolver
-        if (server.host.includes('spamhaus') && (returnCode === '127.255.255.254' || returnCode === '127.255.255.255')) {
+        // Spamhaus ZEN: 127.255.255.0/24 indicates query refusal or rate-limit code
+        if (server.host.includes('spamhaus') && returnCode.startsWith('127.255.255.')) {
           openResolverWarnings++;
           return {
             host: server.host,
@@ -462,7 +466,7 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
             listed: false,
             returnCode,
             description: server.desc,
-            notice: 'Spamhaus public resolver query limit (Requires direct DNS resolver or registered DQS key).',
+            notice: 'Spamhaus public resolver refusal code (Requires direct DNS resolver or registered DQS key).',
           };
         }
 
