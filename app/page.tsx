@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Check,
   AlertCircle,
@@ -24,7 +25,7 @@ import {
   Zap,
   Lock,
   ChevronRight,
-  Sparkles,
+  SlidersHorizontal,
   CreditCard,
   CheckCircle2,
 } from 'lucide-react';
@@ -520,6 +521,36 @@ export default function HomePage() {
                 <div>
                   <div className="font-medium text-[var(--text-primary)]">Domain audit failed</div>
                   <div className="text-[var(--text-secondary)] mt-0.5">{auditError}</div>
+                </div>
+              </div>
+            )}
+
+            {/* ASYNC SKELETON LOADER (Anti-Vibecoding Rule #21: Layout-Matched Skeletons) */}
+            {isAuditing && !auditResult && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-pulse">
+                <div className="lg:col-span-8 space-y-6">
+                  <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] h-20 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-[var(--bg-elevated)]" />
+                      <div className="space-y-2">
+                        <div className="h-4 w-36 rounded bg-[var(--bg-elevated)]" />
+                        <div className="h-3 w-48 rounded bg-[var(--bg-elevated)]" />
+                      </div>
+                    </div>
+                    <div className="h-6 w-28 rounded-full bg-[var(--bg-elevated)]" />
+                  </div>
+                  <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-4">
+                    <div className="h-4 w-44 rounded bg-[var(--bg-elevated)]" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[0, 1, 2, 3, 4, 5].map((idx) => (
+                        <div key={idx} className="p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] h-16" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="lg:col-span-4 p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] h-72 flex flex-col items-center justify-center space-y-4">
+                  <div className="h-32 w-32 rounded-full border-4 border-[var(--border-subtle)] bg-[var(--bg-elevated)]" />
+                  <div className="h-4 w-28 rounded bg-[var(--bg-elevated)]" />
                 </div>
               </div>
             )}
@@ -1359,7 +1390,7 @@ export default function HomePage() {
               {/* PLAN 2: OUTBOUND WATCHDOG ($49/mo) — RECOMMENDED TIER */}
               <div className="p-7 rounded-2xl bg-[var(--bg-surface)] border-2 border-[var(--border-focus)] flex flex-col justify-between space-y-6 shadow-md relative hover:shadow-lg transition-all">
                 <div className="absolute -top-3 right-6 px-3 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-telemetry uppercase tracking-wider font-semibold shadow-xs">
-                  Most Popular
+                  Target: 1–5 Outbound SDR Domains
                 </div>
 
                 <div className="space-y-4">
@@ -1651,29 +1682,37 @@ export default function HomePage() {
       {/* FOOTER */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] py-8 pb-24 text-xs text-[var(--text-muted)] transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text-primary)]">InboxSentinel</span>
-            <span>—</span>
+            <span className="text-[var(--text-dim)]">·</span>
             <span>Passive domain observability for B2B outbound teams.</span>
           </div>
           <div className="flex flex-wrap items-center gap-4 font-telemetry text-[11px]">
-            <button
-              type="button"
-              data-clickable="true"
-              onClick={() => setLegalModalTab('privacy')}
+            <Link
+              href="/privacy"
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey) {
+                  e.preventDefault();
+                  setLegalModalTab('privacy');
+                }
+              }}
               className="hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
             >
               Privacy Policy
-            </button>
+            </Link>
             <span>•</span>
-            <button
-              type="button"
-              data-clickable="true"
-              onClick={() => setLegalModalTab('terms')}
+            <Link
+              href="/terms"
+              onClick={(e) => {
+                if (!e.metaKey && !e.ctrlKey) {
+                  e.preventDefault();
+                  setLegalModalTab('terms');
+                }
+              }}
               className="hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
             >
               Terms of Service
-            </button>
+            </Link>
             <span>•</span>
             <button
               type="button"
@@ -1692,7 +1731,7 @@ export default function HomePage() {
       {/* MODAL: ADD SENDING DOMAIN DRAWER */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="max-w-lg w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 shadow-2xl space-y-6 transform animate-in zoom-in-95 duration-150">
+          <div className="max-w-lg w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 shadow-[0_12px_40px_rgba(0,0,0,0.12)] space-y-6 transform animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="h-8 w-8 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center">
@@ -1842,7 +1881,7 @@ export default function HomePage() {
       {/* MODAL: TRUST, LEGAL & SECURITY CENTER */}
       {legalModalTab && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="max-w-2xl w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 shadow-2xl space-y-6 transform animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+          <div className="max-w-2xl w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 shadow-[0_12px_40px_rgba(0,0,0,0.12)] space-y-6 transform animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-[var(--border-subtle)] shrink-0">
               <div className="flex items-center gap-2.5">
@@ -2012,7 +2051,7 @@ export default function HomePage() {
       {/* MODAL: STUDIO CHECKOUT & FLEET ACTIVATION */}
       {checkoutModalPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="max-w-lg w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6 transform animate-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col overflow-y-auto">
+          <div className="max-w-lg w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 sm:p-7 shadow-[0_12px_40px_rgba(0,0,0,0.12)] space-y-6 transform animate-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b border-[var(--border-subtle)] shrink-0">
               <div className="flex items-center gap-2.5">
@@ -2138,7 +2177,7 @@ export default function HomePage() {
               {showStripeGuide && (
                 <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-2.5 text-xs text-[var(--text-secondary)] animate-in fade-in duration-150">
                   <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+                    <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-500" />
                     <span>Zero-Code Payment Setup:</span>
                   </div>
                   <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">

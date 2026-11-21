@@ -9,7 +9,7 @@
    ========================================================================= */
 :root {
   --bg-base: #faf9f5;
-  --bg-surface: #ffffff;
+  --bg-surface: #fcfbf8;
   --bg-elevated: #f4f3ed;
   --bg-hover: #ebe9e0;
   --border-subtle: #e8e6dc;
@@ -32,7 +32,7 @@
   --badge-rose-border: #fecdd3;
   --badge-rose-text: #9f1239;
   --btn-primary-bg: #141413;
-  --btn-primary-text: #ffffff;
+  --btn-primary-text: #faf9f5;
   --btn-primary-hover: #262624;
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --code-bg: #f4f3ed;
@@ -70,7 +70,7 @@
   --badge-rose-text: #fda4af;
   --btn-primary-bg: #f5f3ef;
   --btn-primary-text: #0c0c0b;
-  --btn-primary-hover: #ffffff;
+  --btn-primary-hover: #faf9f5;
   --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --code-bg: #0c0c0b;
   --code-text: #f5f3ef;
@@ -104,7 +104,7 @@
     --badge-rose-text: #fda4af;
     --btn-primary-bg: #f5f3ef;
     --btn-primary-text: #0c0c0b;
-    --btn-primary-hover: #ffffff;
+    --btn-primary-hover: #faf9f5;
     --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
     --code-bg: #0c0c0b;
     --code-text: #f5f3ef;

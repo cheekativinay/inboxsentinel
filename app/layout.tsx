@@ -23,7 +23,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'InboxSentinel — B2B Outbound Deliverability Watchdog',
+  title: 'InboxSentinel | B2B Outbound Deliverability Watchdog',
   description:
     'Continuous diagnostic monitoring for B2B cold outbound domains. Real-time Spamhaus blacklists, DMARC alignment, and SPF 10-lookup PermError detection.',
 };
