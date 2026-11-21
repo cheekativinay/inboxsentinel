@@ -11,7 +11,7 @@ async function runTests() {
   console.log(`  - MX Records: ${result.mx.records.length} found`);
   console.log(`  - SPF Record: ${result.spf.rawRecord}`);
   console.log(`  - SPF Lookups: ${result.spf.lookupCount}/10 (Limit exceeded: ${result.spf.lookupLimitExceeded})`);
-  console.log(`  - DMARC Policy: ${result.dmarc.policy} (Compliant: ${result.dmarc.isCompliant2026})`);
+  console.log(`  - DMARC Policy: ${result.dmarc.policy} (Compliant: ${result.dmarc.isCompliantGoogleYahoo2024})`);
   console.log(`  - Blacklists Checked: ${result.blacklists.totalChecked} (Listed: ${result.blacklists.listedCount})`);
   console.log(`  - Score: ${result.healthScore}/100 [${result.healthStatus}]`);
 

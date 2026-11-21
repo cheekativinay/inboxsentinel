@@ -16,12 +16,20 @@ export async function executeDomainCheck(item: MonitoredDomain): Promise<{
   let newStatus: MonitoredDomain['status'] = 'optimal';
   const issues: string[] = [];
 
-  if (audit.healthStatus === 'CRITICAL') {
+  if (audit.healthStatus === 'UNCONFIGURED') {
+    newStatus = 'unconfigured';
+    issues.push(...audit.summary.critical);
+  } else if (audit.healthStatus === 'CRITICAL_BLACKLISTED') {
     newStatus = 'critical';
+    issues.push(...audit.summary.critical);
+  } else if (audit.healthStatus === 'CONFIGURATION_ERROR') {
+    newStatus = 'error';
     issues.push(...audit.summary.critical);
   } else if (audit.healthStatus === 'AT_RISK') {
     newStatus = 'at_risk';
     issues.push(...audit.summary.warnings);
+  } else {
+    newStatus = 'optimal';
   }
 
   const blacklistedNames = audit.blacklists.results
@@ -30,8 +38,8 @@ export async function executeDomainCheck(item: MonitoredDomain): Promise<{
 
   let alertDispatched = false;
 
-  // If status is critical or at_risk and a webhook is configured, dispatch notification
-  if (newStatus !== 'optimal' && item.webhookUrl) {
+  // Only dispatch siren if actually blacklisted or experiencing fatal configuration error
+  if ((newStatus === 'critical' || newStatus === 'error') && item.webhookUrl) {
     try {
       let payload: Record<string, unknown> = {};
 
@@ -130,6 +138,7 @@ export async function runAllDomainChecks(): Promise<{
   criticalCount: number;
   atRiskCount: number;
   optimalCount: number;
+  unconfiguredCount: number;
   domains: MonitoredDomain[];
 }> {
   const domains = getMonitoredDomains();
@@ -138,13 +147,15 @@ export async function runAllDomainChecks(): Promise<{
   let criticalCount = 0;
   let atRiskCount = 0;
   let optimalCount = 0;
+  let unconfiguredCount = 0;
 
   for (const item of domains) {
     const { domain: updated } = await executeDomainCheck(item);
     updatedList.push(updated);
 
-    if (updated.status === 'critical') criticalCount++;
+    if (updated.status === 'critical' || updated.status === 'error') criticalCount++;
     else if (updated.status === 'at_risk') atRiskCount++;
+    else if (updated.status === 'unconfigured') unconfiguredCount++;
     else optimalCount++;
   }
 
@@ -155,6 +166,7 @@ export async function runAllDomainChecks(): Promise<{
     criticalCount,
     atRiskCount,
     optimalCount,
+    unconfiguredCount,
     domains: updatedList,
   };
 }

@@ -3,28 +3,41 @@ import dns from 'dns';
 export interface BlacklistCheckResult {
   host: string;
   name: string;
+  type: 'domain' | 'ip';
+  target: string;
   listed: boolean;
   returnCode?: string;
   description: string;
+  notice?: string;
 }
+
+export type DeliverabilityHealthStatus =
+  | 'OPTIMAL'
+  | 'AT_RISK'
+  | 'CRITICAL_BLACKLISTED'
+  | 'CONFIGURATION_ERROR'
+  | 'UNCONFIGURED';
 
 export interface DomainAuditResult {
   domain: string;
   scannedAt: string;
   responseTimeMs: number;
   healthScore: number;
-  healthStatus: 'OPTIMAL' | 'AT_RISK' | 'CRITICAL';
+  healthStatus: DeliverabilityHealthStatus;
+  statusLabel: string;
+  statusDescription: string;
   estimatedLostPipelineUsd: number;
   emailProvider: 'Google Workspace' | 'Microsoft 365' | 'Zoho Mail' | 'Custom / Self-Hosted' | 'No Mailserver';
   mx: {
     installed: boolean;
-    records: Array<{ exchange: string; priority: number }>;
+    records: Array<{ exchange: string; priority: number; resolvedIp?: string }>;
   };
   spf: {
     installed: boolean;
+    status: 'valid' | 'missing' | 'fail';
     rawRecord: string | null;
     lookupCount: number;
-    lookupLimitExceeded: boolean; // RFC limit is 10
+    lookupLimitExceeded: boolean; // RFC 7208 limit is 10
     qualifier: '~all' | '-all' | '?all' | '+all' | 'none';
     issues: string[];
   };
@@ -33,7 +46,9 @@ export interface DomainAuditResult {
     rawRecord: string | null;
     policy: 'reject' | 'quarantine' | 'none' | 'missing';
     rua: string | null;
-    isCompliant2026: boolean;
+    isCompliantGoogleYahoo2024: boolean;
+    recommendedRecord: string;
+    rolloutPhase: string;
     issues: string[];
   };
   dkim: {
@@ -45,6 +60,7 @@ export interface DomainAuditResult {
     totalChecked: number;
     listedCount: number;
     cleanCount: number;
+    openResolverWarnings: number;
     results: BlacklistCheckResult[];
   };
   summary: {
@@ -54,13 +70,49 @@ export interface DomainAuditResult {
   };
 }
 
-const DNSBL_SERVERS = [
-  { host: 'zen.spamhaus.org', name: 'Spamhaus ZEN', desc: 'SBL, XBL, and PBL multi-source blacklist. Fatal to inbox delivery.' },
-  { host: 'b.barracudacentral.org', name: 'Barracuda Rep', desc: 'Widely used by corporate enterprise email gateways.' },
-  { host: 'bl.spamcop.net', name: 'SpamCop', desc: 'Real-time automated user spam reporting list.' },
-  { host: 'dnsbl.sorbs.net', name: 'SORBS Aggregate', desc: 'Comprehensive spam and open relay database.' },
-  { host: 'psbl.surriel.com', name: 'PSBL', desc: 'Passive Spam Block List based on spam traps.' },
-  { host: 'truncate.gbudb.net', name: 'GBUdb Truncate', desc: 'Real-time IP reputation and spam probability list.' },
+// 1. True Domain-Based Blacklists (Query format: <domain>.<host>)
+const DOMAIN_BLACKLISTS = [
+  {
+    host: 'dbl.spamhaus.org',
+    name: 'Spamhaus DBL (Domain)',
+    type: 'domain' as const,
+    desc: 'Spamhaus Domain Block List. Checks domain reputation directly across phishing, malware, and spam sources.',
+  },
+  {
+    host: 'multi.surbl.org',
+    name: 'SURBL (Domain URI)',
+    type: 'domain' as const,
+    desc: 'SURBL multi-list domain reputation. Detects domains appearing in unsolicited emails.',
+  },
+];
+
+// 2. Mailserver IP Blacklists (Query format: <reversed-mx-ip>.<host>)
+// NOTE: SORBS was shut down in June 2024 and has been permanently removed.
+const IP_BLACKLISTS = [
+  {
+    host: 'zen.spamhaus.org',
+    name: 'Spamhaus ZEN (Mail IP)',
+    type: 'ip' as const,
+    desc: 'Combined SBL, XBL, and PBL IP reputation list. Checks the sending mailserver IP.',
+  },
+  {
+    host: 'bl.spamcop.net',
+    name: 'SpamCop (Mail IP)',
+    type: 'ip' as const,
+    desc: 'Automated real-time user-reported spam trap database for sending mailserver IPs.',
+  },
+  {
+    host: 'b.barracudacentral.org',
+    name: 'Barracuda Rep (Mail IP)',
+    type: 'ip' as const,
+    desc: 'Barracuda Central IP reputation list used widely across enterprise email gateways.',
+  },
+  {
+    host: 'psbl.surriel.com',
+    name: 'PSBL (Mail IP)',
+    type: 'ip' as const,
+    desc: 'Passive Spam Block List based on automated trap hits.',
+  },
 ];
 
 function withTimeout<T>(promise: Promise<T>, ms = 3000): Promise<T> {
@@ -163,24 +215,18 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
 
   const resolver = new dns.promises.Resolver();
 
-  // 1. Resolve A records to get mail/host IP
-  let ips: string[] = [];
-  try {
-    ips = await withTimeout(resolver.resolve4(domain), 2500);
-  } catch {
-    // Domain might still have MX records even without A record
-  }
-
-  // 2. Resolve MX Records
-  let mxRecords: Array<{ exchange: string; priority: number }> = [];
+  // 1. Resolve MX Records (Primary routing for email delivery)
+  let mxRecords: Array<{ exchange: string; priority: number; resolvedIp?: string }> = [];
   try {
     const rawMx = await withTimeout(resolver.resolveMx(domain), 2500);
     mxRecords = rawMx.sort((a, b) => a.priority - b.priority);
   } catch {
-    // No MX found
+    // No MX records found
   }
 
   let emailProvider: DomainAuditResult['emailProvider'] = 'No Mailserver';
+  let primaryMxIp: string | null = null;
+
   if (mxRecords.length > 0) {
     const mxStr = mxRecords.map((m) => m.exchange.toLowerCase()).join(' ');
     if (mxStr.includes('google') || mxStr.includes('aspmx')) {
@@ -192,9 +238,20 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
     } else {
       emailProvider = 'Custom / Self-Hosted';
     }
+
+    // Resolve primary MX exchange to IPv4 to accurately test mailserver IP blacklists
+    try {
+      const resolved = await withTimeout(resolver.resolve4(mxRecords[0].exchange), 2000);
+      if (resolved && resolved.length > 0) {
+        primaryMxIp = resolved[0];
+        mxRecords[0].resolvedIp = primaryMxIp;
+      }
+    } catch {
+      // Could not resolve MX host IP
+    }
   }
 
-  // 3. Resolve TXT records for SPF
+  // 2. Resolve TXT records for SPF
   let txtRecords: string[][] = [];
   try {
     txtRecords = await withTimeout(resolver.resolveTxt(domain), 2500);
@@ -208,10 +265,10 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
   let spfLookupCount = 0;
   let spfQualifier: DomainAuditResult['spf']['qualifier'] = 'none';
   const spfIssues: string[] = [];
+  const isSpfInstalled = Boolean(spfRecord);
 
   if (spfRecord) {
     const parts = spfRecord.split(/\s+/);
-    // Count DNS lookup mechanisms
     for (const part of parts) {
       const lower = part.toLowerCase();
       if (
@@ -234,19 +291,25 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
     else if (spfRecord.includes('+all')) spfQualifier = '+all';
 
     if (spfLookupCount > 10) {
-      spfIssues.push(`SPF DNS lookup limit exceeded (${spfLookupCount}/10 maximum). RFC 7208 mandates a 10-lookup ceiling; exceeding this causes Google and Yahoo to throw PermError and reject messages.`);
+      spfIssues.push(`SPF PermError: ${spfLookupCount}/10 lookup limit exceeded (RFC 7208). Google & Yahoo reject mail exceeding this limit.`);
     }
 
     if (spfQualifier === '+all') {
-      spfIssues.push('SPF qualifier is set to "+all" (Pass all). This allows any unauthorized IP in the world to spoof your domain.');
+      spfIssues.push('SPF qualifier is "+all" (Pass all), which allows anyone to send on your behalf.');
     } else if (spfQualifier === '?all') {
-      spfIssues.push('SPF qualifier is set to "?all" (Neutral). Outbound email will not pass strict spam filtering.');
+      spfIssues.push('SPF qualifier is "?all" (Neutral), which provides weak authentication for cold outbound.');
     }
   } else {
-    spfIssues.push('No SPF record found. Email sent from this domain will fail sender authentication.');
+    spfIssues.push('No SPF TXT record found. Outbound emails will fail SPF authentication.');
   }
 
-  // 4. Resolve DMARC Record (_dmarc.<domain>)
+  const spfStatus: DomainAuditResult['spf']['status'] = !isSpfInstalled
+    ? 'missing'
+    : spfLookupCount > 10
+    ? 'fail'
+    : 'valid';
+
+  // 3. Resolve DMARC Record (_dmarc.<domain>)
   let dmarcTxt: string[][] = [];
   try {
     dmarcTxt = await withTimeout(resolver.resolveTxt(`_dmarc.${domain}`), 2500);
@@ -276,13 +339,23 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
     }
 
     if (dmarcPolicy === 'none') {
-      dmarcIssues.push('DMARC policy is set to "p=none" (monitoring only). While compliant for basic setup, modern outbound deliverability requires "p=quarantine" or "p=reject" to prevent domain spoofing.');
+      dmarcIssues.push('DMARC policy is set to "p=none" (monitoring mode). Fully meets Google/Yahoo 2024 compliance; advance to quarantine/reject once alignment is confirmed.');
     }
   } else {
-    dmarcIssues.push('No DMARC record found at _dmarc.' + domain + '. As of 2024, Google and Yahoo reject unauthenticated bulk emails missing DMARC.');
+    dmarcIssues.push('No DMARC record found at _dmarc.' + domain + '. Senders of 5,000+ daily emails to Google/Yahoo require DMARC with at least p=none.');
   }
 
-  // 5. DKIM Selector Probe (Check standard selectors: google, default, selector1, k1)
+  // Google & Yahoo 2024 Bulk Sender rules require DMARC with at least p=none
+  const isCompliantGoogleYahoo2024 = dmarcPolicy !== 'missing';
+
+  // Safe DMARC Recommendation: If domain has no MX, warn that rua must use a working mail domain
+  const reportingMailbox = mxRecords.length > 0
+    ? `dmarc-reports@${domain}`
+    : `reports@your-primary-domain.com`;
+
+  const recommendedDmarcRecord = `v=DMARC1; p=none; pct=100; rua=mailto:${reportingMailbox}; sp=none; aspf=r;`;
+
+  // 4. DKIM Selector Probe
   const commonSelectors = ['google', 'default', 'selector1', 'k1', 's1'];
   let dkimDetected = false;
   let dkimSelector: string | null = null;
@@ -299,128 +372,210 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
         break;
       }
     } catch {
-      // Selector not found, continue
+      // Continue
     }
   }
 
-  // 6. Real-time DNSBL / RBL Blacklist Checks
-  const targetIp = ips[0] || '127.0.0.1';
-  const reversedIp = targetIp.split('.').reverse().join('.');
-
+  // 5. Blacklist Observability (Domain DBL + Mailserver IP RBL)
   const blacklistResults: BlacklistCheckResult[] = [];
   let listedCount = 0;
+  let openResolverWarnings = 0;
 
-  // Query blacklists in parallel with strict timeout
-  const blPromises = DNSBL_SERVERS.map(async (server) => {
-    const queryHost = `${reversedIp}.${server.host}`;
+  // A. Check Domain Blacklists (DBL, SURBL)
+  const domainBlPromises = DOMAIN_BLACKLISTS.map(async (server) => {
+    const queryHost = `${domain}.${server.host}`;
     try {
       const res = await withTimeout(resolver.resolve4(queryHost), 2000);
       if (res && res.length > 0) {
         const returnCode = res[0];
-        // Protection: Spamhaus returns 127.255.255.254 or .255 when queried via an open resolver.
-        // This is a query refusal notice, NOT a blacklist entry.
-        const isSpamhausRefusal =
-          server.host.includes('spamhaus') &&
-          (returnCode === '127.255.255.254' || returnCode === '127.255.255.255');
 
-        if (!isSpamhausRefusal) {
-          listedCount++;
+        // Spamhaus DBL: 127.0.1.255 indicates query refusal via open/public resolver
+        if (server.host.includes('spamhaus') && returnCode === '127.0.1.255') {
+          openResolverWarnings++;
           return {
             host: server.host,
             name: server.name,
-            listed: true,
+            type: server.type,
+            target: domain,
+            listed: false,
             returnCode,
             description: server.desc,
+            notice: 'Spamhaus public resolver query limit (Requires direct DNS resolver or registered DQS key).',
           };
         }
+
+        listedCount++;
+        return {
+          host: server.host,
+          name: server.name,
+          type: server.type,
+          target: domain,
+          listed: true,
+          returnCode,
+          description: server.desc,
+        };
       }
     } catch {
-      // ENOTFOUND means NOT listed (Clean!)
+      // ENOTFOUND = Clean
     }
 
     return {
       host: server.host,
       name: server.name,
+      type: server.type,
+      target: domain,
       listed: false,
       description: server.desc,
     };
   });
 
-  const resolvedBL = await Promise.all(blPromises);
-  blacklistResults.push(...resolvedBL);
+  // B. Check Mailserver IP Blacklists (Only if MX records exist and primary IP resolved)
+  const ipBlPromises = IP_BLACKLISTS.map(async (server) => {
+    if (!primaryMxIp) {
+      return {
+        host: server.host,
+        name: server.name,
+        type: server.type,
+        target: 'No MX IP',
+        listed: false,
+        description: server.desc,
+        notice: 'Skipped: Domain has no configured mailserver IP.',
+      };
+    }
 
-  // 7. Calculate Health Score and Status
-  let score = 100;
+    const reversedMxIp = primaryMxIp.split('.').reverse().join('.');
+    const queryHost = `${reversedMxIp}.${server.host}`;
+
+    try {
+      const res = await withTimeout(resolver.resolve4(queryHost), 2000);
+      if (res && res.length > 0) {
+        const returnCode = res[0];
+
+        // Spamhaus ZEN: 127.255.255.254/255 indicates query refusal via open recursive resolver
+        if (server.host.includes('spamhaus') && (returnCode === '127.255.255.254' || returnCode === '127.255.255.255')) {
+          openResolverWarnings++;
+          return {
+            host: server.host,
+            name: server.name,
+            type: server.type,
+            target: primaryMxIp,
+            listed: false,
+            returnCode,
+            description: server.desc,
+            notice: 'Spamhaus public resolver query limit (Requires direct DNS resolver or registered DQS key).',
+          };
+        }
+
+        listedCount++;
+        return {
+          host: server.host,
+          name: server.name,
+          type: server.type,
+          target: primaryMxIp,
+          listed: true,
+          returnCode,
+          description: server.desc,
+        };
+      }
+    } catch {
+      // ENOTFOUND = Clean
+    }
+
+    return {
+      host: server.host,
+      name: server.name,
+      type: server.type,
+      target: primaryMxIp,
+      listed: false,
+      description: server.desc,
+    };
+  });
+
+  const [resolvedDomainBL, resolvedIpBL] = await Promise.all([
+    Promise.all(domainBlPromises),
+    Promise.all(ipBlPromises),
+  ]);
+
+  blacklistResults.push(...resolvedDomainBL, ...resolvedIpBL);
+
+  // 6. Transparent, Accurate Health Status Determination
   const passed: string[] = [];
   const warnings: string[] = [];
   const critical: string[] = [];
 
-  // Blacklist deductions (Fatal)
-  if (listedCount > 0) {
-    score -= listedCount * 35;
-    critical.push(`CRITICAL: Domain/IP is actively listed on ${listedCount} spam blacklist(s). Outbound emails are getting flagged directly into junk folders.`);
-  } else {
-    passed.push(`Clean across all ${DNSBL_SERVERS.length} major spam blacklists (Spamhaus, Barracuda, SpamCop, SORBS).`);
-  }
+  let healthStatus: DeliverabilityHealthStatus = 'OPTIMAL';
+  let statusLabel = 'Optimal Deliverability';
+  let statusDescription = 'Domain records and mailservers passed standard deliverability checks.';
+  let score = 100;
 
-  // MX checks
-  if (mxRecords.length > 0) {
-    passed.push(`Active mailserver configured (${emailProvider} • ${mxRecords[0].exchange})`);
-  } else {
-    score -= 30;
-    critical.push('No MX records detected. Domain cannot receive bounce reports or incoming replies.');
-  }
+  // CASE 1: UNCONFIGURED DOMAIN (No MX records)
+  if (mxRecords.length === 0) {
+    healthStatus = 'UNCONFIGURED';
+    statusLabel = 'Unconfigured (No Mail Records)';
+    statusDescription = 'This domain has no MX records. It is not configured to send or receive emails.';
+    score = 0; // Distinct from "Burned / Blacklisted"
+    critical.push('No MX records detected. Domain cannot receive incoming emails or bounce reports.');
 
-  // SPF checks
-  if (spfRecord) {
-    if (spfLookupCount <= 10 && spfQualifier !== '+all' && spfQualifier !== '?all') {
-      passed.push(`Valid SPF record found (${spfLookupCount}/10 DNS lookups, qualifier: ${spfQualifier})`);
-    } else if (spfLookupCount > 10) {
-      score -= 20;
-      critical.push(`SPF PermError: 10-lookup limit exceeded (${spfLookupCount} lookups). Google and Yahoo reject this.`);
-    } else {
-      score -= 10;
-      warnings.push(`SPF qualifier "${spfQualifier}" is weak for outbound cold email.`);
+    if (!isSpfInstalled) {
+      warnings.push('No SPF record found (Not configured for email sending).');
     }
-  } else {
-    score -= 25;
-    critical.push('Missing SPF record. Outbound mail fails sender authorization.');
-  }
-
-  // DMARC checks
-  if (dmarcRecord) {
-    if (dmarcPolicy === 'reject' || dmarcPolicy === 'quarantine') {
-      passed.push(`Strict DMARC policy active (p=${dmarcPolicy}) with reporting configured.`);
-    } else {
-      score -= 10;
-      warnings.push('DMARC policy is set to "p=none". Upgrade to quarantine or reject to protect sender reputation.');
+    if (dmarcPolicy === 'missing') {
+      warnings.push('No DMARC record found (Not configured for email sending).');
     }
-  } else {
-    score -= 25;
-    critical.push('Missing DMARC record (_dmarc.' + domain + '). Violates 2024-2026 bulk sender compliance.');
+
+    if (listedCount > 0) {
+      critical.push(`Domain is flagged on ${listedCount} domain blacklist(s).`);
+    } else {
+      passed.push('Domain name is clean across verified domain reputation lists (DBL, SURBL).');
+    }
   }
-
-  // DKIM checks
-  if (dkimDetected) {
-    passed.push(`DKIM signature public key discovered (selector: "${dkimSelector}").`);
-  } else {
-    warnings.push('Could not verify DKIM on common default selectors. Verify DKIM is signed by your sending ESP.');
+  // CASE 2: ACTIVELY BLACKLISTED (Domain or Mailserver IP is on a blacklist)
+  else if (listedCount > 0) {
+    healthStatus = 'CRITICAL_BLACKLISTED';
+    statusLabel = 'Blacklist Alert Detected';
+    statusDescription = `Domain or mailserver IP is actively listed on ${listedCount} spam blacklist(s). Outbound emails are at high risk of spam folder placement.`;
+    score = Math.max(10, 100 - listedCount * 40);
+    critical.push(`Domain or sending IP is actively flagged on ${listedCount} blacklist authority(ies).`);
   }
-
-  score = Math.max(10, Math.min(100, score));
-
-  let healthStatus: DomainAuditResult['healthStatus'] = 'OPTIMAL';
-  if (score < 60 || critical.length > 0) {
-    healthStatus = 'CRITICAL';
-  } else if (score < 85 || warnings.length > 0) {
+  // CASE 3: CONFIGURATION ERROR (SPF PermError > 10 lookups or syntax breakage)
+  else if (spfLookupCount > 10) {
+    healthStatus = 'CONFIGURATION_ERROR';
+    statusLabel = 'SPF PermError (Exceeds Limit)';
+    statusDescription = `SPF record requires ${spfLookupCount} DNS lookups, exceeding the RFC 7208 hard limit of 10. Major providers reject these messages.`;
+    score = 45;
+    critical.push(`SPF PermError: ${spfLookupCount}/10 DNS lookups exceeds RFC 7208 ceiling.`);
+  }
+  // CASE 4: AT RISK (Missing SPF, Missing DMARC, or weak qualifier on an active mail domain)
+  else if (!isSpfInstalled || dmarcPolicy === 'missing' || dmarcPolicy === 'none' || spfLookupCount > 7) {
     healthStatus = 'AT_RISK';
-  }
+    statusLabel = 'At Risk: Incomplete Authentication';
+    statusDescription = 'Domain has active mailservers, but authentication records are incomplete or unaligned.';
+    score = 75;
 
-  let estimatedLostPipelineUsd = 0;
-  if (healthStatus === 'CRITICAL') {
-    estimatedLostPipelineUsd = 3200;
-  } else if (healthStatus === 'AT_RISK') {
-    estimatedLostPipelineUsd = 850;
+    if (!isSpfInstalled) {
+      score -= 20;
+      critical.push('Missing SPF record. Outbound emails will fail sender authorization.');
+    } else if (spfLookupCount > 7) {
+      warnings.push(`SPF lookup count is high (${spfLookupCount}/10). Adding additional tools may trigger PermError.`);
+    }
+
+    if (dmarcPolicy === 'missing') {
+      score -= 20;
+      warnings.push('Missing DMARC record. Bulk email to Google and Yahoo requires a DMARC policy.');
+    } else if (dmarcPolicy === 'none') {
+      warnings.push('DMARC is in monitoring mode (p=none). Advance to quarantine or reject as alignment matures.');
+    }
+  }
+  // CASE 5: OPTIMAL
+  else {
+    healthStatus = 'OPTIMAL';
+    statusLabel = 'Optimal Deliverability';
+    statusDescription = 'Domain records, SPF, DMARC, and mailserver IP reputation are fully aligned.';
+    score = 100;
+    passed.push(`Mailserver verified (${emailProvider} • ${mxRecords[0].exchange})`);
+    passed.push(`Valid SPF record (${spfLookupCount}/10 DNS lookups consumed)`);
+    passed.push(`Enforced DMARC policy (p=${dmarcPolicy})`);
+    passed.push(`Clean across all ${blacklistResults.length} domain and mailserver blacklist checks`);
   }
 
   const responseTimeMs = Date.now() - startTime;
@@ -431,14 +586,17 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
     responseTimeMs,
     healthScore: score,
     healthStatus,
-    estimatedLostPipelineUsd,
+    statusLabel,
+    statusDescription,
+    estimatedLostPipelineUsd: 0,
     emailProvider,
     mx: {
       installed: mxRecords.length > 0,
       records: mxRecords,
     },
     spf: {
-      installed: Boolean(spfRecord),
+      installed: isSpfInstalled,
+      status: spfStatus,
       rawRecord: spfRecord,
       lookupCount: spfLookupCount,
       lookupLimitExceeded: spfLookupCount > 10,
@@ -450,7 +608,9 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
       rawRecord: dmarcRecord,
       policy: dmarcPolicy,
       rua: dmarcRua,
-      isCompliant2026: dmarcPolicy === 'reject' || dmarcPolicy === 'quarantine',
+      isCompliantGoogleYahoo2024,
+      recommendedRecord: recommendedDmarcRecord,
+      rolloutPhase: 'Phase 1: Monitoring (p=none) -> Phase 2: Quarantine -> Phase 3: Reject',
       issues: dmarcIssues,
     },
     dkim: {
@@ -459,9 +619,10 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
       rawRecord: dkimRaw,
     },
     blacklists: {
-      totalChecked: DNSBL_SERVERS.length,
+      totalChecked: blacklistResults.length,
       listedCount,
-      cleanCount: DNSBL_SERVERS.length - listedCount,
+      cleanCount: blacklistResults.length - listedCount,
+      openResolverWarnings,
       results: blacklistResults,
     },
     summary: {

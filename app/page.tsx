@@ -25,10 +25,13 @@ import {
   Lock,
   ChevronRight,
   Sparkles,
+  CreditCard,
+  CheckCircle2,
 } from 'lucide-react';
 import { DomainAuditResult } from '@/lib/dns-engine';
 import { MonitoredDomain, CheckLog } from '@/lib/store';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { PAYMENT_PLANS, getCheckoutUrl } from '@/lib/payments';
 
 export default function HomePage() {
   const [domainInput, setDomainInput] = useState('stripe.com');
@@ -64,16 +67,50 @@ export default function HomePage() {
   // Pricing state
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
+  // Checkout Modal & Activation state
+  const [checkoutModalPlan, setCheckoutModalPlan] = useState<{
+    id: 'watchdog' | 'agency';
+    name: string;
+    monthlyPrice: number;
+    annualPrice: number;
+    domainLimit: number;
+    features: string[];
+  } | null>(null);
+  const [showStripeGuide, setShowStripeGuide] = useState(false);
+
+  const handleStartPlan = (planId: 'watchdog' | 'agency') => {
+    const directUrl = getCheckoutUrl(planId, billingCycle);
+    if (directUrl && directUrl.startsWith('http') && !directUrl.includes('test_')) {
+      window.open(directUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const plan = PAYMENT_PLANS[planId];
+    if (plan) {
+      setCheckoutModalPlan({
+        id: planId,
+        name: plan.name,
+        monthlyPrice: plan.monthlyPrice,
+        annualPrice: plan.annualPrice,
+        domainLimit: plan.domainLimit,
+        features: plan.features,
+      });
+      setShowStripeGuide(false);
+    }
+  };
+
   // Legal & Trust Modal state
   const [legalModalTab, setLegalModalTab] = useState<'privacy' | 'terms' | 'security' | null>(null);
 
-  // ROI Calculator state
-  const [monthlyOutboundBudget, setMonthlyOutboundBudget] = useState<number>(20000);
+  // Outbound Risk Calculator state (Interactive Model)
+  const [calcDomains, setCalcDomains] = useState<number>(3);
+  const [calcEmailsPerDay, setCalcEmailsPerDay] = useState<number>(50);
+  const [calcMeetingRate, setCalcMeetingRate] = useState<number>(2.0); // 2.0%
+  const [calcDealValue, setCalcDealValue] = useState<number>(1500); // $1,500
+  const [calcSpamImpact, setCalcSpamImpact] = useState<number>(35); // 35% placement drop
 
   const presets = [
     { name: 'Stripe Corporate', domain: 'stripe.com', status: 'compliant', badge: '100 / 100' },
-    { name: 'Unaligned DMARC', domain: 'demo-unaligned-outbound.com', status: 'warning', badge: 'p=none' },
-    { name: 'Flagged Sender', domain: 'demo-flagged-sender.com', status: 'critical', badge: 'Blacklisted' },
+    { name: 'Unconfigured Test', domain: 'inboxsentinel.netlify.app', status: 'unconfigured', badge: 'Unconfigured' },
   ];
 
   const fetchMonitors = async () => {
@@ -244,14 +281,17 @@ export default function HomePage() {
     setTimeout(() => setCopiedSnippet(false), 2000);
   };
 
-  // Arithmetic for ROI
-  const estimatedLostMeetings = Math.round((monthlyOutboundBudget * 0.18));
-  const sentinelCost = 49;
-  const netRetained = Math.max(0, estimatedLostMeetings - sentinelCost);
+  // Interactive Outbound Risk Model Math
+  const monthlyVolume = calcDomains * calcEmailsPerDay * 22; // 22 business days
+  const monthlyExpectedMeetings = Math.round((monthlyVolume * (calcMeetingRate / 100)) * 10) / 10;
+  const monthlyExpectedPipeline = Math.round(monthlyExpectedMeetings * calcDealValue);
+  const monthlyPipelineAtRisk = Math.round(monthlyExpectedPipeline * (calcSpamImpact / 100));
 
-  // Fleet stats
+  // Fleet stats with clean separation
   const optimalCount = monitors.filter((m) => m.status === 'optimal').length;
-  const criticalCount = monitors.filter((m) => m.status === 'critical').length;
+  const blacklistedCount = monitors.filter((m) => m.blacklistedOn && m.blacklistedOn.length > 0).length;
+  const atRiskCount = monitors.filter((m) => m.status === 'at_risk' || m.status === 'error').length;
+  const unconfiguredCount = monitors.filter((m) => m.status === 'unconfigured').length;
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col font-sans transition-colors duration-200">
@@ -302,7 +342,7 @@ export default function HomePage() {
               >
                 <Server className="h-3.5 w-3.5" />
                 <span>Fleet Monitors</span>
-                {criticalCount > 0 ? (
+                {blacklistedCount > 0 ? (
                   <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                 ) : (
                   <span className="text-[10px] font-telemetry px-1.5 py-0.2 rounded bg-[var(--bg-base)] text-[var(--text-muted)]">
@@ -515,6 +555,8 @@ export default function HomePage() {
                             ? 'bg-[var(--badge-emerald-bg)] border-[var(--badge-emerald-border)] text-[var(--badge-emerald-text)]'
                             : auditResult.healthStatus === 'AT_RISK'
                             ? 'bg-[var(--badge-amber-bg)] border-[var(--badge-amber-border)] text-[var(--badge-amber-text)]'
+                            : auditResult.healthStatus === 'UNCONFIGURED'
+                            ? 'bg-slate-500/10 border-slate-500/20 text-slate-600 dark:text-slate-400'
                             : 'bg-[var(--badge-rose-bg)] border-[var(--badge-rose-border)] text-[var(--badge-rose-text)]'
                         }`}
                       >
@@ -524,15 +566,21 @@ export default function HomePage() {
                               ? 'bg-emerald-500'
                               : auditResult.healthStatus === 'AT_RISK'
                               ? 'bg-amber-500'
+                              : auditResult.healthStatus === 'UNCONFIGURED'
+                              ? 'bg-slate-400'
                               : 'bg-rose-500'
                           }`}
                         />
                         <span>
                           {auditResult.healthStatus === 'OPTIMAL'
-                            ? 'Optimal Reputation'
+                            ? 'Optimal Deliverability'
                             : auditResult.healthStatus === 'AT_RISK'
-                            ? 'At Risk (Unenforced)'
-                            : 'Burned / Blacklisted'}
+                            ? 'At Risk (Action Recommended)'
+                            : auditResult.healthStatus === 'UNCONFIGURED'
+                            ? 'Unconfigured (No Mail Setup)'
+                            : auditResult.healthStatus === 'CONFIGURATION_ERROR'
+                            ? 'Configuration Error (PermError)'
+                            : 'Blacklisted on Spam Authorities'}
                         </span>
                       </span>
                     </div>
@@ -544,7 +592,7 @@ export default function HomePage() {
                       <div className="flex items-center gap-2">
                         <Shield className="h-4 w-4 text-[var(--text-secondary)]" />
                         <span className="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider font-telemetry">
-                          Spamhaus & DNSBL Blacklist Matrix
+                          Domain DBL & Mailserver IP Reputation
                         </span>
                       </div>
                       <span className="text-xs font-telemetry text-[var(--text-secondary)]">
@@ -566,16 +614,25 @@ export default function HomePage() {
                             <span className="font-medium text-[var(--text-primary)]">{r.name}</span>
                             <span
                               className={`h-2 w-2 rounded-full ${
-                                r.listed ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'
+                                r.listed
+                                  ? 'bg-rose-500 animate-pulse'
+                                  : r.notice
+                                  ? 'bg-slate-400'
+                                  : 'bg-emerald-500'
                               }`}
                             />
                           </div>
                           <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                            <span className="truncate max-w-[120px]">{r.host}</span>
-                            <span className={r.listed ? 'text-rose-500 font-semibold' : 'text-emerald-500 font-medium'}>
-                              {r.listed ? 'LISTED' : 'CLEAN'}
+                            <span className="truncate max-w-[120px]">{r.target || r.host}</span>
+                            <span className={r.listed ? 'text-rose-500 font-semibold' : r.notice ? 'text-[var(--text-muted)]' : 'text-emerald-500 font-medium'}>
+                              {r.listed ? 'LISTED' : r.notice ? 'SKIPPED' : 'CLEAN'}
                             </span>
                           </div>
+                          {r.notice && (
+                            <div className="text-[10px] text-[var(--text-muted)] pt-1 italic border-t border-[var(--border-subtle)]/50 mt-1.5">
+                              {r.notice}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -589,13 +646,13 @@ export default function HomePage() {
                         <span className="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider font-telemetry">
                           DMARC Policy (RFC 7489)
                         </span>
-                        {auditResult.dmarc.isCompliant2026 ? (
+                        {auditResult.dmarc.isCompliantGoogleYahoo2024 ? (
                           <span className="text-[11px] font-telemetry text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-                            <Check className="h-3.5 w-3.5" /> Compliant
+                            <Check className="h-3.5 w-3.5" /> Google/Yahoo Ready
                           </span>
                         ) : (
                           <span className="text-[11px] font-telemetry text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" /> Action Needed
+                            <AlertCircle className="h-3.5 w-3.5" /> Missing
                           </span>
                         )}
                       </div>
@@ -606,12 +663,12 @@ export default function HomePage() {
 
                       <div className="text-xs text-[var(--text-secondary)] space-y-1">
                         <div className="flex justify-between">
-                          <span className="text-[var(--text-muted)]">Discovered Policy:</span>
+                          <span className="text-[var(--text-muted)]">Active Policy:</span>
                           <span className="font-telemetry text-[var(--text-primary)] font-medium">p={auditResult.dmarc.policy}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-[var(--text-muted)]">2026 Bulk Target:</span>
-                          <span className="font-telemetry text-[var(--text-primary)]">p=quarantine or reject</span>
+                          <span className="text-[var(--text-muted)]">Google/Yahoo Rule:</span>
+                          <span className="font-telemetry text-[var(--text-primary)]">p=none minimum</span>
                         </div>
                       </div>
                     </div>
@@ -622,9 +679,13 @@ export default function HomePage() {
                         <span className="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider font-telemetry">
                           SPF 10-Lookup Ceiling (RFC 7208)
                         </span>
-                        {auditResult.spf.lookupLimitExceeded ? (
+                        {auditResult.spf.status === 'fail' ? (
                           <span className="text-[11px] font-telemetry text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" /> PermError
+                            <AlertCircle className="h-3.5 w-3.5" /> Fail (PermError)
+                          </span>
+                        ) : auditResult.spf.status === 'missing' ? (
+                          <span className="text-[11px] font-telemetry text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" /> Missing
                           </span>
                         ) : (
                           <span className="text-[11px] font-telemetry text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
@@ -709,7 +770,9 @@ export default function HomePage() {
                           stroke="currentColor"
                           strokeWidth="8"
                           className={
-                            auditResult.healthScore >= 90
+                            auditResult.healthStatus === 'UNCONFIGURED'
+                              ? 'text-slate-400'
+                              : auditResult.healthScore >= 90
                               ? 'text-emerald-500'
                               : auditResult.healthScore >= 50
                               ? 'text-amber-500'
@@ -717,24 +780,26 @@ export default function HomePage() {
                           }
                           fill="transparent"
                           strokeDasharray={2 * Math.PI * 54}
-                          strokeDashoffset={2 * Math.PI * 54 * (1 - auditResult.healthScore / 100)}
+                          strokeDashoffset={
+                            auditResult.healthStatus === 'UNCONFIGURED'
+                              ? 2 * Math.PI * 54
+                              : 2 * Math.PI * 54 * (1 - auditResult.healthScore / 100)
+                          }
                           strokeLinecap="round"
                         />
                       </svg>
                       <div className="absolute flex flex-col items-center">
                         <span className="text-3xl font-bold font-telemetry text-[var(--text-primary)]">
-                          {auditResult.healthScore}
+                          {auditResult.healthStatus === 'UNCONFIGURED' ? 'N/A' : auditResult.healthScore}
                         </span>
-                        <span className="text-[10px] font-telemetry text-[var(--text-muted)]">/ 100</span>
+                        <span className="text-[10px] font-telemetry text-[var(--text-muted)]">
+                          {auditResult.healthStatus === 'UNCONFIGURED' ? 'Unconfigured' : '/ 100'}
+                        </span>
                       </div>
                     </div>
 
                     <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                      {auditResult.healthScore >= 90
-                        ? '100% ready for cold outbound sequences. Zero blacklist listings detected.'
-                        : auditResult.healthScore >= 50
-                        ? 'Risk of spam placement. DMARC policy is unenforced or SPF lookup limits are strained.'
-                        : 'CRITICAL: Domain is blacklisted on major spam authorities or missing essential records.'}
+                      {auditResult.statusDescription}
                     </p>
 
                     {/* Dominant Primary Action (Fitts's Law >= 44px) */}
@@ -784,12 +849,12 @@ export default function HomePage() {
                   <div className="p-5 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-3 shadow-xs">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider font-telemetry">
-                        Recommended DMARC TXT
+                        Recommended DMARC TXT (Phase 1 Safe Setup)
                       </span>
                       <button
                         type="button"
                         data-clickable="true"
-                        onClick={() => copyText(`v=DMARC1; p=reject; pct=100; rua=mailto:dmarc@${auditResult.domain}`)}
+                        onClick={() => copyText(auditResult.dmarc.recommendedRecord)}
                         className="text-[11px] font-telemetry text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         {copiedSnippet ? (
@@ -807,10 +872,13 @@ export default function HomePage() {
                     </div>
 
                     <div className="p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-subtle)] font-telemetry text-[11px] text-[var(--text-primary)] break-all">
-                      v=DMARC1; p=reject; pct=100; rua=mailto:dmarc@{auditResult.domain}
+                      {auditResult.dmarc.recommendedRecord}
                     </div>
-                    <div className="text-[11px] text-[var(--text-muted)]">
-                      Add as a TXT record at host name <code>_dmarc.{auditResult.domain}</code>
+                    <div className="text-[11px] text-[var(--text-muted)] space-y-1">
+                      <div>Add as a TXT record at host name <code>_dmarc.{auditResult.domain}</code></div>
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                        {auditResult.dmarc.rolloutPhase}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -865,11 +933,11 @@ export default function HomePage() {
               </div>
               <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
                 <div className="text-[11px] font-telemetry uppercase tracking-wider text-[var(--text-muted)]">Blacklist Alarms</div>
-                <div className="text-2xl font-bold font-telemetry text-rose-600 dark:text-rose-400 mt-1">{criticalCount}</div>
+                <div className="text-2xl font-bold font-telemetry text-rose-600 dark:text-rose-400 mt-1">{blacklistedCount}</div>
               </div>
               <div className="p-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs">
-                <div className="text-[11px] font-telemetry uppercase tracking-wider text-[var(--text-muted)]">Background Probes</div>
-                <div className="text-2xl font-bold font-telemetry text-[var(--text-primary)] mt-1">{checkLogs.length}</div>
+                <div className="text-[11px] font-telemetry uppercase tracking-wider text-[var(--text-muted)]">Unconfigured Setup</div>
+                <div className="text-2xl font-bold font-telemetry text-amber-600 dark:text-amber-400 mt-1">{unconfiguredCount}</div>
               </div>
             </div>
 
@@ -902,17 +970,37 @@ export default function HomePage() {
                         <td className="py-4 px-4">
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border ${
-                              m.status === 'optimal'
-                                ? 'bg-[var(--badge-emerald-bg)] border-[var(--badge-emerald-border)] text-[var(--badge-emerald-text)]'
-                                : 'bg-[var(--badge-rose-bg)] border-[var(--badge-rose-border)] text-[var(--badge-rose-text)]'
+                              m.blacklistedOn && m.blacklistedOn.length > 0
+                                ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
+                                : m.status === 'unconfigured'
+                                ? 'bg-slate-500/10 border-slate-500/20 text-slate-600 dark:text-slate-400'
+                                : m.status === 'at_risk' || m.status === 'error'
+                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'
+                                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                             }`}
                           >
                             <span
                               className={`h-1.5 w-1.5 rounded-full ${
-                                m.status === 'optimal' ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'
+                                m.blacklistedOn && m.blacklistedOn.length > 0
+                                  ? 'bg-rose-500 animate-pulse'
+                                  : m.status === 'unconfigured'
+                                  ? 'bg-slate-400'
+                                  : m.status === 'at_risk' || m.status === 'error'
+                                  ? 'bg-amber-500'
+                                  : 'bg-emerald-500'
                               }`}
                             />
-                            <span>{m.status === 'optimal' ? 'Clean' : `Blacklisted (${m.blacklistedOn.length})`}</span>
+                            <span>
+                              {m.blacklistedOn && m.blacklistedOn.length > 0
+                                ? `Blacklisted (${m.blacklistedOn.length})`
+                                : m.status === 'unconfigured'
+                                ? 'Unconfigured'
+                                : m.status === 'at_risk'
+                                ? 'At Risk'
+                                : m.status === 'error'
+                                ? 'PermError'
+                                : 'Clean'}
+                            </span>
                           </span>
                         </td>
                         <td className="py-4 px-4 text-[var(--text-secondary)]">
@@ -997,66 +1085,146 @@ export default function HomePage() {
         {currentView === 'calculator' && (
           <div className="max-w-4xl mx-auto space-y-10 py-4">
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)]">Outbound Pipeline Exposure</h2>
-              <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-[65ch]">
-                Evaluate potential meeting and pipeline loss resulting from a burned secondary domain hitting Spamhaus or failing 2026 DMARC policies.
+              <div className="inline-flex items-center gap-2 text-[11px] font-telemetry uppercase tracking-wider text-[var(--text-muted)]">
+                <span>Interactive Math Model</span>
+                <span>•</span>
+                <span>Illustrative Estimate</span>
+              </div>
+              <h2 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] mt-1">
+                Outbound Pipeline Exposure Calculator
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-[70ch]">
+                Estimate the potential pipeline at risk when secondary cold sending domains silently land in spam or encounter SPF lookup PermErrors.
               </p>
             </div>
 
             <div className="p-8 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] space-y-8 shadow-xs">
-              {/* Spend Slider */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider font-telemetry">
-                    Monthly Outbound Sales Payroll & Tool Spend:
-                  </label>
-                  <span className="text-2xl font-bold font-telemetry text-[var(--text-primary)]">
-                    ${monthlyOutboundBudget.toLocaleString()}
-                  </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Input 1: Active Domains */}
+                <div className="space-y-2 p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text-secondary)]">Active Sending Domains:</label>
+                    <span className="text-base font-bold font-telemetry text-[var(--text-primary)]">{calcDomains} domains</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={calcDomains}
+                    onChange={(e) => setCalcDomains(Number(e.target.value))}
+                    className="w-full h-2 bg-[var(--bg-base)] rounded-lg appearance-none cursor-pointer accent-[var(--btn-primary-bg)]"
+                  />
+                  <div className="flex justify-between text-[10px] font-telemetry text-[var(--text-muted)]">
+                    <span>1 domain</span>
+                    <span>10 domains</span>
+                    <span>20 domains</span>
+                  </div>
                 </div>
 
-                <input
-                  type="range"
-                  min="2000"
-                  max="100000"
-                  step="1000"
-                  value={monthlyOutboundBudget}
-                  onChange={(e) => setMonthlyOutboundBudget(Number(e.target.value))}
-                  className="w-full h-2 bg-[var(--bg-elevated)] rounded-lg appearance-none cursor-pointer accent-[var(--btn-primary-bg)]"
-                />
+                {/* Input 2: Daily Emails */}
+                <div className="space-y-2 p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text-secondary)]">Emails / Day per Domain:</label>
+                    <span className="text-base font-bold font-telemetry text-[var(--text-primary)]">{calcEmailsPerDay} emails</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="20"
+                    max="100"
+                    step="5"
+                    value={calcEmailsPerDay}
+                    onChange={(e) => setCalcEmailsPerDay(Number(e.target.value))}
+                    className="w-full h-2 bg-[var(--bg-base)] rounded-lg appearance-none cursor-pointer accent-[var(--btn-primary-bg)]"
+                  />
+                  <div className="flex justify-between text-[10px] font-telemetry text-[var(--text-muted)]">
+                    <span>20/day</span>
+                    <span>50/day</span>
+                    <span>100/day</span>
+                  </div>
+                </div>
 
-                <div className="flex justify-between text-[11px] font-telemetry text-[var(--text-muted)]">
-                  <span>$2,000/mo</span>
-                  <span>$50,000/mo</span>
-                  <span>$100,000/mo</span>
+                {/* Input 3: Positive Reply / Meeting Rate */}
+                <div className="space-y-2 p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text-secondary)]">Meeting Booking Rate:</label>
+                    <span className="text-base font-bold font-telemetry text-[var(--text-primary)]">{calcMeetingRate}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="5.0"
+                    step="0.1"
+                    value={calcMeetingRate}
+                    onChange={(e) => setCalcMeetingRate(Number(e.target.value))}
+                    className="w-full h-2 bg-[var(--bg-base)] rounded-lg appearance-none cursor-pointer accent-[var(--btn-primary-bg)]"
+                  />
+                  <div className="flex justify-between text-[10px] font-telemetry text-[var(--text-muted)]">
+                    <span>0.5%</span>
+                    <span>2.0%</span>
+                    <span>5.0%</span>
+                  </div>
+                </div>
+
+                {/* Input 4: Deal Pipeline Value */}
+                <div className="space-y-2 p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text-secondary)]">Avg Pipeline Value / Meeting:</label>
+                    <span className="text-base font-bold font-telemetry text-[var(--text-primary)]">${calcDealValue.toLocaleString()}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="500"
+                    max="5000"
+                    step="250"
+                    value={calcDealValue}
+                    onChange={(e) => setCalcDealValue(Number(e.target.value))}
+                    className="w-full h-2 bg-[var(--bg-base)] rounded-lg appearance-none cursor-pointer accent-[var(--btn-primary-bg)]"
+                  />
+                  <div className="flex justify-between text-[10px] font-telemetry text-[var(--text-muted)]">
+                    <span>$500</span>
+                    <span>$2,500</span>
+                    <span>$5,000</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-[var(--border-subtle)]">
+              {/* Calculated Results */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-[var(--border-subtle)]">
                 <div className="p-5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-1">
-                  <div className="text-xs text-[var(--text-muted)] font-telemetry">Estimated Pipeline Burn</div>
-                  <div className="text-3xl font-bold font-telemetry text-rose-600 dark:text-rose-400">
-                    ${estimatedLostMeetings.toLocaleString()}
+                  <div className="text-xs text-[var(--text-muted)] font-telemetry">Monthly Send Volume</div>
+                  <div className="text-2xl font-bold font-telemetry text-[var(--text-primary)]">
+                    {monthlyVolume.toLocaleString()}
                   </div>
                   <div className="text-[11px] text-[var(--text-secondary)] pt-1">
-                    Based on 18% deliverability placement loss when a domain gets flagged.
+                    Across 22 business sending days.
                   </div>
                 </div>
 
                 <div className="p-5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-1">
-                  <div className="text-xs text-[var(--text-muted)] font-telemetry">Net Capital Retained</div>
-                  <div className="text-3xl font-bold font-telemetry text-emerald-600 dark:text-emerald-400">
-                    +${netRetained.toLocaleString()}
+                  <div className="text-xs text-[var(--text-muted)] font-telemetry">Target Monthly Pipeline</div>
+                  <div className="text-2xl font-bold font-telemetry text-emerald-600 dark:text-emerald-400">
+                    ${monthlyExpectedPipeline.toLocaleString()}
                   </div>
                   <div className="text-[11px] text-[var(--text-secondary)] pt-1">
-                    After $49/mo Sentinel watchdog protection.
+                    ~{monthlyExpectedMeetings} meetings booked.
+                  </div>
+                </div>
+
+                <div className="p-5 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-1">
+                  <div className="text-xs text-[var(--text-muted)] font-telemetry">Estimated Risk (35% Spam Placement)</div>
+                  <div className="text-2xl font-bold font-telemetry text-rose-600 dark:text-rose-400">
+                    ${monthlyPipelineAtRisk.toLocaleString()}
+                  </div>
+                  <div className="text-[11px] text-[var(--text-secondary)] pt-1">
+                    Pipeline at risk if reputation drops.
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)] flex items-center justify-between gap-4">
-                <div className="text-xs text-[var(--text-secondary)]">
-                  A single burned domain costs more in lost SDR meetings than 6 years of InboxSentinel.
+              <div className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="text-xs text-[var(--text-secondary)] max-w-[65ch]">
+                  <em>Disclaimer:</em> This calculation is an illustrative financial model based on user-provided conversion assumptions, not a contractual performance guarantee.
                 </div>
                 <button
                   type="button"
@@ -1064,7 +1232,7 @@ export default function HomePage() {
                   onClick={() => setCurrentView('pricing')}
                   className="px-4 py-2 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 text-xs font-semibold rounded-lg shrink-0 transition-all cursor-pointer active:scale-[0.98] shadow-xs"
                 >
-                  Protect Fleet ($49/mo)
+                  View Watchdog Plans
                 </button>
               </div>
             </div>
@@ -1078,7 +1246,7 @@ export default function HomePage() {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-2 text-[11px] font-telemetry uppercase tracking-wider text-[var(--text-muted)]">
-                  <span>Transparent Deliverability Insurance</span>
+                  <span>Transparent Deliverability Protection</span>
                   <span>•</span>
                   <span>Zero Contracts</span>
                   <span>•</span>
@@ -1249,12 +1417,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     data-clickable="true"
-                    onClick={() => {
-                      setNewDomain('company-outbound.com');
-                      setNewLabel('Watchdog 5-Domain Pool');
-                      setCurrentView('monitors');
-                      setShowAddModal(true);
-                    }}
+                    onClick={() => handleStartPlan('watchdog')}
                     className="w-full min-h-[46px] px-6 py-3 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                   >
                     <span>Start Watchdog (${billingCycle === 'annual' ? '39' : '49'}/mo)</span>
@@ -1285,7 +1448,7 @@ export default function HomePage() {
                   </div>
 
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                    Multi-client deliverability insurance for lead gen agencies managing multiple outbound pools.
+                    Multi-client deliverability protection for lead gen agencies managing multiple outbound pools.
                   </p>
 
                   <div className="space-y-2.5 pt-4 border-t border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
@@ -1320,12 +1483,7 @@ export default function HomePage() {
                   <button
                     type="button"
                     data-clickable="true"
-                    onClick={() => {
-                      setNewDomain('agency-client-pool.com');
-                      setNewLabel('Agency Fleet 30-Domain Tier');
-                      setCurrentView('monitors');
-                      setShowAddModal(true);
-                    }}
+                    onClick={() => handleStartPlan('agency')}
                     className="w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-[var(--border-prominent)] bg-[var(--bg-elevated)] hover:bg-[var(--bg-hover)] text-xs font-semibold text-[var(--text-primary)] transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                   >
                     <span>Deploy Agency Fleet (${billingCycle === 'annual' ? '119' : '149'}/mo)</span>
@@ -1371,7 +1529,7 @@ export default function HomePage() {
                   Why SDR outbound domains burn silently.
                 </h3>
                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                  Spamhaus and Barracuda don&apos;t send notification emails when your domain reputation drops. When a prospect marks your cold outbound sequence as spam or your SPF exceeds 10 lookups, 100% of your SDR campaigns route silently to the spam folder.
+                  Spamhaus and Barracuda don&apos;t send notification emails when a domain reputation drops. When a prospect marks cold outbound sequences as spam or an SPF record exceeds 10 DNS lookups, messages frequently route silently to spam folders without bounce notifications.
                 </p>
               </div>
 
@@ -1392,7 +1550,7 @@ export default function HomePage() {
                     <span>2-Second Siren Dispatch</span>
                   </div>
                   <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
-                    The moment a domain gets flagged on Spamhaus ZEN or Barracuda, an alert payload is dispatched to your Slack, Discord, or Telegram.
+                    The moment a domain reputation drop is detected, an alert payload is dispatched to your Slack, Discord (or Telegram/Custom Webhooks on Agency Fleet).
                   </p>
                 </div>
 
@@ -1441,16 +1599,22 @@ export default function HomePage() {
                       <td className="py-3.5 px-5 text-center font-telemetry text-[var(--text-primary)] font-semibold">Every 15 minutes</td>
                     </tr>
                     <tr className="hover:bg-[var(--bg-elevated)]/40 transition-colors">
-                      <td className="py-3.5 px-5 text-[var(--text-primary)] font-medium">Spam Blacklists Checked (DNSBL)</td>
-                      <td className="py-3.5 px-5 text-center text-[var(--text-secondary)] font-telemetry">All 6 major lists</td>
-                      <td className="py-3.5 px-5 text-center font-telemetry text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">All 6 major lists</td>
-                      <td className="py-3.5 px-5 text-center font-telemetry text-[var(--text-primary)]">All 6 major lists</td>
+                      <td className="py-3.5 px-5 text-[var(--text-primary)] font-medium">Domain DBL & Mail IP Reputation</td>
+                      <td className="py-3.5 px-5 text-center text-[var(--text-secondary)] font-telemetry">On-demand</td>
+                      <td className="py-3.5 px-5 text-center font-telemetry text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">Continuous 24/7</td>
+                      <td className="py-3.5 px-5 text-center font-telemetry text-[var(--text-primary)]">Continuous 24/7</td>
                     </tr>
                     <tr className="hover:bg-[var(--bg-elevated)]/40 transition-colors">
                       <td className="py-3.5 px-5 text-[var(--text-primary)] font-medium">Slack & Discord Webhook Sirens</td>
                       <td className="py-3.5 px-5 text-center text-[var(--text-muted)]">—</td>
                       <td className="py-3.5 px-5 text-center text-emerald-500 bg-emerald-500/5">✓ Included</td>
                       <td className="py-3.5 px-5 text-center text-emerald-500">✓ Included</td>
+                    </tr>
+                    <tr className="hover:bg-[var(--bg-elevated)]/40 transition-colors">
+                      <td className="py-3.5 px-5 text-[var(--text-primary)] font-medium">Telegram Bot & Custom HTTP Webhooks</td>
+                      <td className="py-3.5 px-5 text-center text-[var(--text-muted)]">—</td>
+                      <td className="py-3.5 px-5 text-center text-[var(--text-muted)] bg-emerald-500/5">—</td>
+                      <td className="py-3.5 px-5 text-center text-emerald-500 font-medium">✓ Included</td>
                     </tr>
                     <tr className="hover:bg-[var(--bg-elevated)]/40 transition-colors">
                       <td className="py-3.5 px-5 text-[var(--text-primary)] font-medium">SPF 10-Lookup PermError Guard</td>
@@ -1463,6 +1627,12 @@ export default function HomePage() {
                       <td className="py-3.5 px-5 text-center text-[var(--text-muted)]">—</td>
                       <td className="py-3.5 px-5 text-center text-[var(--text-muted)] bg-emerald-500/5">—</td>
                       <td className="py-3.5 px-5 text-center text-emerald-500 font-medium">✓ Included</td>
+                    </tr>
+                    <tr className="hover:bg-[var(--bg-elevated)]/40 transition-colors">
+                      <td className="py-3.5 px-5 text-[var(--text-primary)] font-medium">Priority Parallel Socket Execution</td>
+                      <td className="py-3.5 px-5 text-center text-[var(--text-muted)]">Standard</td>
+                      <td className="py-3.5 px-5 text-center text-[var(--text-muted)] bg-emerald-500/5">Standard</td>
+                      <td className="py-3.5 px-5 text-center text-emerald-500 font-medium">✓ Priority Edge</td>
                     </tr>
                     <tr className="hover:bg-[var(--bg-elevated)]/40 transition-colors">
                       <td className="py-3.5 px-5 text-[var(--text-primary)] font-medium">Deliverability CSV Audit Reports</td>
@@ -1479,7 +1649,7 @@ export default function HomePage() {
       </main>
 
       {/* FOOTER */}
-      <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] py-8 text-xs text-[var(--text-muted)] transition-colors duration-200">
+      <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] py-8 pb-24 text-xs text-[var(--text-muted)] transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-[var(--text-primary)]">InboxSentinel</span>
@@ -1834,6 +2004,147 @@ export default function HomePage() {
               >
                 Close Center
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: STUDIO CHECKOUT & FLEET ACTIVATION */}
+      {checkoutModalPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="max-w-lg w-full bg-[var(--bg-surface)] border border-[var(--border-prominent)] rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6 transform animate-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--border-subtle)] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                    Activate {checkoutModalPlan.name}
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-muted)] font-telemetry">
+                    Continuous 24/7 background DNSBL tripwire • Zero passwords
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-clickable="true"
+                onClick={() => setCheckoutModalPlan(null)}
+                className="h-8 w-8 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Plan Price Summary */}
+            <div className="p-4 rounded-xl bg-[var(--bg-base)] border border-[var(--border-subtle)] space-y-3">
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <div className="text-xs text-[var(--text-muted)] font-telemetry uppercase tracking-wider">
+                    Selected Subscription
+                  </div>
+                  <div className="text-sm font-semibold text-[var(--text-primary)]">
+                    {checkoutModalPlan.name} ({billingCycle === 'annual' ? 'Annual - Save 20%' : 'Monthly'})
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold font-telemetry text-[var(--text-primary)]">
+                    ${billingCycle === 'annual' ? checkoutModalPlan.annualPrice : checkoutModalPlan.monthlyPrice}
+                    <span className="text-xs font-normal text-[var(--text-muted)]">/mo</span>
+                  </div>
+                  <div className="text-[10px] text-[var(--text-muted)] font-telemetry">
+                    {billingCycle === 'annual'
+                      ? `Billed $${checkoutModalPlan.annualPrice * 12}/year`
+                      : 'Billed monthly • Cancel anytime'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-[var(--border-subtle)] space-y-1.5 text-xs text-[var(--text-secondary)]">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>Up to <strong>{checkoutModalPlan.domainLimit} active outbound domains</strong></span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>Automated 15-minute background sweeps</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>Instant sirens via Slack, Discord{checkoutModalPlan.id === 'agency' ? ' & Telegram' : ''}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Zero-Access Trust Pillars */}
+            <div className="p-3.5 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                <Shield className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>The Zero-Access Guarantee</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+                We never request mailbox logins, Google Workspace OAuth, or write access to DNS. Monitoring runs entirely via passive public DNS queries.
+              </p>
+            </div>
+
+            {/* Founder Setup Notice / Stripe Link Guide */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                data-clickable="true"
+                onClick={() => {
+                  const directUrl = getCheckoutUrl(checkoutModalPlan.id, billingCycle);
+                  if (directUrl && directUrl.startsWith('http') && !directUrl.includes('test_')) {
+                    window.open(directUrl, '_blank', 'noopener,noreferrer');
+                  } else {
+                    setCheckoutModalPlan(null);
+                    setCurrentView('monitors');
+                    setNewDomain('');
+                    setNewLabel(`${checkoutModalPlan.name} Monitored Pool`);
+                    setShowAddModal(true);
+                  }
+                }}
+                className="w-full min-h-[46px] px-6 py-3 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 text-xs font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+              >
+                <CreditCard className="h-4 w-4" />
+                <span>
+                  {getCheckoutUrl(checkoutModalPlan.id, billingCycle) && !getCheckoutUrl(checkoutModalPlan.id, billingCycle).includes('test_')
+                    ? 'Proceed to Secure Stripe Checkout'
+                    : 'Activate Fleet Monitoring & Add Domains'}
+                </span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  data-clickable="true"
+                  onClick={() => setShowStripeGuide(!showStripeGuide)}
+                  className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
+                >
+                  {showStripeGuide ? 'Hide Stripe Payment Link Setup' : 'How to connect your Stripe Payment Link (60s)'}
+                </button>
+              </div>
+
+              {showStripeGuide && (
+                <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-2.5 text-xs text-[var(--text-secondary)] animate-in fade-in duration-150">
+                  <div className="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Zero-Code Payment Setup:</span>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+                    <li>Go to your <strong>Stripe Dashboard → Payment Links</strong>.</li>
+                    <li>Click <strong>New</strong> and create a recurring product for <strong>${billingCycle === 'annual' ? checkoutModalPlan.annualPrice : checkoutModalPlan.monthlyPrice}/mo</strong>.</li>
+                    <li>Copy the link (e.g., <code>https://buy.stripe.com/abc...</code>).</li>
+                    <li>Add it to your <code>.env.local</code> as <code>NEXT_PUBLIC_STRIPE_{checkoutModalPlan.id.toUpperCase()}_{billingCycle.toUpperCase()}_URL</code>.</li>
+                  </ol>
+                  <p className="text-[10px] text-[var(--text-muted)] pt-1">
+                    Stripe handles credit cards, Apple Pay, Google Pay, international VAT/tax receipts, and customer self-serve cancellations automatically.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -43,6 +43,7 @@ async function handleSweep(req: NextRequest) {
         criticalCount: summary.criticalCount,
         atRiskCount: summary.atRiskCount,
         optimalCount: summary.optimalCount,
+        unconfiguredCount: summary.unconfiguredCount,
       },
       message: `24/7 passive DNS sweep completed across ${summary.totalChecked} outbound domains in ${durationMs}ms.`,
       domains: summary.domains.map((d) => ({

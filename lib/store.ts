@@ -8,7 +8,7 @@ export interface MonitoredDomain {
   intervalMinutes: number; // 15, 30, 60
   channel: 'slack' | 'discord' | 'telegram' | 'webhook';
   webhookUrl: string;
-  status: 'optimal' | 'at_risk' | 'critical';
+  status: 'optimal' | 'at_risk' | 'critical' | 'unconfigured' | 'error';
   lastCheckedAt: string | null;
   lastResponseTimeMs: number | null;
   dmarcPolicy: string;
@@ -22,7 +22,7 @@ export interface CheckLog {
   id: string;
   domain: string;
   checkedAt: string;
-  status: 'optimal' | 'at_risk' | 'critical';
+  status: 'optimal' | 'at_risk' | 'critical' | 'unconfigured' | 'error';
   responseTimeMs: number;
   blacklistedCount: number;
   dmarcPolicy: string;
@@ -46,89 +46,22 @@ const DEFAULT_DOMAINS: MonitoredDomain[] = [
   {
     id: 'dom_stripe',
     domain: 'stripe.com',
-    label: 'Stripe Corporate Outbound',
+    label: 'Primary Sending Domain',
     intervalMinutes: 15,
     channel: 'slack',
     webhookUrl: '',
     status: 'optimal',
-    lastCheckedAt: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
-    lastResponseTimeMs: 480,
+    lastCheckedAt: null,
+    lastResponseTimeMs: null,
     dmarcPolicy: 'reject',
     spfLookupCount: 3,
     blacklistedOn: [],
     issues: [],
-    createdAt: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: 'dom_unaligned',
-    domain: 'demo-unaligned-outbound.com',
-    label: 'Client Outbound Pool 2',
-    intervalMinutes: 15,
-    channel: 'slack',
-    webhookUrl: '',
-    status: 'at_risk',
-    lastCheckedAt: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-    lastResponseTimeMs: 510,
-    dmarcPolicy: 'none',
-    spfLookupCount: 9,
-    blacklistedOn: [],
-    issues: ['DMARC policy set to p=none (Fails Google 2026 bulk sender rule).'],
-    createdAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString(),
-  },
-  {
-    id: 'dom_blacklisted_demo',
-    domain: 'demo-flagged-sender.com',
-    label: 'Secondary Cold SDR Domain',
-    intervalMinutes: 15,
-    channel: 'discord',
-    webhookUrl: '',
-    status: 'critical',
-    lastCheckedAt: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-    lastResponseTimeMs: 420,
-    dmarcPolicy: 'missing',
-    spfLookupCount: 12,
-    blacklistedOn: ['Spamhaus ZEN', 'Barracuda Rep'],
-    issues: ['Actively listed on Spamhaus ZEN', 'SPF PermError: 12 lookups exceeds RFC limit of 10'],
-    createdAt: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
+    createdAt: new Date().toISOString(),
   },
 ];
 
-const DEFAULT_LOGS: CheckLog[] = [
-  {
-    id: 'log_1',
-    domain: 'demo-flagged-sender.com',
-    checkedAt: new Date(Date.now() - 1 * 60 * 1000).toISOString(),
-    status: 'critical',
-    responseTimeMs: 420,
-    blacklistedCount: 2,
-    dmarcPolicy: 'missing',
-    issues: ['Actively listed on Spamhaus ZEN', 'SPF PermError: 12 lookups exceeds RFC limit of 10'],
-    alertDispatched: true,
-    channel: 'discord',
-  },
-  {
-    id: 'log_2',
-    domain: 'stripe.com',
-    checkedAt: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
-    status: 'optimal',
-    responseTimeMs: 480,
-    blacklistedCount: 0,
-    dmarcPolicy: 'reject',
-    issues: [],
-    alertDispatched: false,
-  },
-  {
-    id: 'log_3',
-    domain: 'demo-unaligned-outbound.com',
-    checkedAt: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
-    status: 'at_risk',
-    responseTimeMs: 510,
-    blacklistedCount: 0,
-    dmarcPolicy: 'none',
-    issues: ['DMARC policy set to p=none'],
-    alertDispatched: false,
-  },
-];
+const DEFAULT_LOGS: CheckLog[] = [];
 
 // In-memory fallback in case filesystem is restricted
 let inMemoryDomains: MonitoredDomain[] = [...DEFAULT_DOMAINS];
