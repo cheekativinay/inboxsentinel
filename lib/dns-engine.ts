@@ -393,8 +393,8 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
       if (res && res.length > 0) {
         const returnCode = res[0];
 
-        // Spamhaus DBL: 127.0.1.255 indicates query refusal via open/public resolver
-        if (server.host.includes('spamhaus') && returnCode === '127.0.1.255') {
+        // Spamhaus DBL: 127.0.1.255 and 127.255.255.0/24 indicate query refusal or rate-limit via public resolvers
+        if (server.host.includes('spamhaus') && (returnCode === '127.0.1.255' || returnCode.startsWith('127.255.255.'))) {
           openResolverWarnings++;
           return {
             host: server.host,
@@ -455,8 +455,8 @@ export async function auditDomainDeliverability(rawInput: string): Promise<Domai
       if (res && res.length > 0) {
         const returnCode = res[0];
 
-        // Spamhaus ZEN: 127.255.255.0/24 indicates query refusal or rate-limit code
-        if (server.host.includes('spamhaus') && returnCode.startsWith('127.255.255.')) {
+        // Spamhaus ZEN: 127.255.255.0/24 or 127.0.0.255 indicates query refusal or rate-limit code
+        if (server.host.includes('spamhaus') && (returnCode.startsWith('127.255.255.') || returnCode === '127.0.0.255' || returnCode === '127.0.1.255')) {
           openResolverWarnings++;
           return {
             host: server.host,
