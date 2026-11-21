@@ -26,6 +26,16 @@ export async function POST(req: NextRequest) {
     const domainValidation = validateAndSanitizeDomain(domain);
     const targetDomain = domainValidation.valid ? domainValidation.domain : 'outbound-domain.com';
 
+    // 2b. Simulated Demo Webhook Handling (prevents 404 when testing placeholder webhook)
+    if (webhookUrl.includes('DEMO/SIMULATION')) {
+      return NextResponse.json({
+        success: true,
+        simulated: true,
+        channel,
+        message: `Simulation verified: valid ${channel.toUpperCase()} siren payload synthesized. Enter a live webhook URL to test direct delivery.`,
+      });
+    }
+
     const timestamp = new Date().toLocaleTimeString();
 
     let payload: Record<string, unknown> = {};
