@@ -2112,19 +2112,26 @@ export default function HomePage() {
                 <span>
                   {getCheckoutUrl(checkoutModalPlan.id, billingCycle) && !getCheckoutUrl(checkoutModalPlan.id, billingCycle).includes('test_')
                     ? 'Proceed to Secure Stripe Checkout'
-                    : 'Activate Fleet Monitoring & Add Domains'}
+                    : 'Claim 14-Day Free Pilot (No Card Required)'}
                 </span>
                 <ArrowRight className="h-4 w-4" />
               </button>
 
-              <div className="text-center">
+              <div className="text-center space-y-1.5 pt-1">
+                <a
+                  href={`mailto:hello.vinaycheekati@gmail.com?subject=Agency%20Invoice%20Request%20-%20InboxSentinel%20${encodeURIComponent(checkoutModalPlan.name)}&body=Hi%20Vinay,%0A%0AWe%20would%20like%20to%20set%20up%20${encodeURIComponent(checkoutModalPlan.name)}%20for%20our%20agency%20with%20direct%20invoicing%20(Wise%20/%20PayPal%20/%20Bank%20Wire).%0A%0AAgency%20Name:%20%0ANumber%20of%20Domains:%20%0A`}
+                  className="block text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
+                >
+                  Need agency invoicing? We support Wise, PayPal, ACH & Wire →
+                </a>
+
                 <button
                   type="button"
                   data-clickable="true"
                   onClick={() => setShowStripeGuide(!showStripeGuide)}
-                  className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
+                  className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors underline-offset-4 hover:underline cursor-pointer"
                 >
-                  {showStripeGuide ? 'Hide Stripe Payment Link Setup' : 'How to connect your Stripe Payment Link (60s)'}
+                  {showStripeGuide ? 'Hide Stripe Payment Link Setup' : 'Founder note: Connect Stripe Payment Link (60s)'}
                 </button>
               </div>
 
