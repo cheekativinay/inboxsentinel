@@ -42,24 +42,7 @@ const DATA_DIR = getDataDir();
 const MONITORS_FILE = path.join(DATA_DIR, 'monitors.json');
 const LOGS_FILE = path.join(DATA_DIR, 'logs.json');
 
-const DEFAULT_DOMAINS: MonitoredDomain[] = [
-  {
-    id: 'dom_stripe',
-    domain: 'stripe.com',
-    label: 'Primary Sending Domain',
-    intervalMinutes: 15,
-    channel: 'slack',
-    webhookUrl: '',
-    status: 'optimal',
-    lastCheckedAt: null,
-    lastResponseTimeMs: null,
-    dmarcPolicy: 'reject',
-    spfLookupCount: 3,
-    blacklistedOn: [],
-    issues: [],
-    createdAt: new Date().toISOString(),
-  },
-];
+const DEFAULT_DOMAINS: MonitoredDomain[] = [];
 
 const DEFAULT_LOGS: CheckLog[] = [];
 

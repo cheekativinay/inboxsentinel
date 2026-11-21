@@ -35,7 +35,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { PAYMENT_PLANS, getCheckoutUrl } from '@/lib/payments';
 
 export default function HomePage() {
-  const [domainInput, setDomainInput] = useState('stripe.com');
+  const [domainInput, setDomainInput] = useState('');
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<DomainAuditResult | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
@@ -163,8 +163,6 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchMonitors();
-    // Pre-populate with live audit on mount so visitor never lands on empty void
-    handleAudit('stripe.com');
   }, []);
 
   const handleAddMonitorSubmit = async (e: React.FormEvent) => {
@@ -572,6 +570,56 @@ Audited via InboxSentinel (Passive Public DNSBL Engine) · https://inboxsentinel
                 <div className="lg:col-span-4 p-6 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] h-72 flex flex-col items-center justify-center space-y-4">
                   <div className="h-32 w-32 rounded-full border-4 border-[var(--border-subtle)] bg-[var(--bg-elevated)]" />
                   <div className="h-4 w-28 rounded bg-[var(--bg-elevated)]" />
+                </div>
+              </div>
+            )}
+
+            {/* INITIAL ZERO-STATE HERO: PRE-FLIGHT DIAGNOSTIC GUIDE */}
+            {!auditResult && !isAuditing && (
+              <div className="p-8 sm:p-10 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] shadow-xs space-y-8">
+                <div className="max-w-xl space-y-2">
+                  <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[var(--bg-elevated)] border border-[var(--border-subtle)] text-[11px] font-telemetry uppercase tracking-wider text-[var(--text-secondary)]">
+                    <Shield className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Public DNS & Blacklist Inspector</span>
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+                    Instant Outbound Deliverability Pre-Flight
+                  </h2>
+                  <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
+                    Type your secondary sending domain above to verify Spamhaus DBL, SpamCop, Barracuda, 10-lookup SPF nesting limits, and Google/Yahoo 2026 DMARC policies in under 2 seconds.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                  <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-2">
+                    <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                      <Shield className="h-3.5 w-3.5 text-emerald-500" />
+                    </div>
+                    <h3 className="text-xs font-semibold text-[var(--text-primary)] font-telemetry uppercase tracking-wider">6 Global Blacklists</h3>
+                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                      Real-time socket verification against Spamhaus DBL/ZEN, SURBL, Barracuda, and SpamCop without seed emails.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-2">
+                    <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                      <Activity className="h-3.5 w-3.5 text-amber-500" />
+                    </div>
+                    <h3 className="text-xs font-semibold text-[var(--text-primary)] font-telemetry uppercase tracking-wider">SPF 10-Lookup Guard</h3>
+                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                      Recursively traces SPF includes to catch RFC 7208 PermErrors before cold campaigns silently route to spam.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] space-y-2">
+                    <div className="h-7 w-7 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+                      <Lock className="h-3.5 w-3.5 text-sky-500" />
+                    </div>
+                    <h3 className="text-xs font-semibold text-[var(--text-primary)] font-telemetry uppercase tracking-wider">Zero-Access Privacy</h3>
+                    <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                      Pure public DNS observability. We never ask for Google Workspace logins, IMAP passwords, or inbox permissions.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -1028,7 +1076,29 @@ Audited via InboxSentinel (Passive Public DNSBL Engine) · https://inboxsentinel
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-subtle)] font-telemetry text-[11px]">
-                    {monitors.map((m) => (
+                    {monitors.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center">
+                          <div className="max-w-xs mx-auto space-y-3">
+                            <div className="h-10 w-10 mx-auto rounded-xl bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center">
+                              <Shield className="h-5 w-5 text-[var(--text-muted)]" />
+                            </div>
+                            <div className="text-xs font-semibold text-[var(--text-primary)] font-sans">No sending domains monitored yet</div>
+                            <p className="text-[11px] text-[var(--text-muted)] font-sans leading-relaxed">
+                              Add your first secondary sending domain to start continuous 15-minute background DNSBL tripwires.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddModal(true)}
+                              className="px-3.5 py-1.5 rounded-lg bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-xs font-semibold hover:opacity-90 transition-all cursor-pointer font-sans"
+                            >
+                              + Add First Domain
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      monitors.map((m) => (
                       <tr key={m.id} className="hover:bg-[var(--bg-elevated)]/60 transition-colors">
                         <td className="py-4 px-4 font-sans">
                           <div className="font-medium text-[var(--text-primary)]">{m.label || m.domain}</div>
@@ -1111,7 +1181,7 @@ Audited via InboxSentinel (Passive Public DNSBL Engine) · https://inboxsentinel
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )))}
                   </tbody>
                 </table>
               </div>
